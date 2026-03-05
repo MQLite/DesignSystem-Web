@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { WizardState } from '../../types'
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'https://localhost:7001'
+
 interface Props {
   state: WizardState
   update: (patch: Partial<WizardState>) => void
@@ -78,7 +80,7 @@ export default function Step7Preview({ state }: Props) {
             {/* Background layer */}
             {selectedBackground?.previewPath ? (
               <img
-                src={`/${selectedBackground.previewPath}`}
+                src={`${API_BASE}/${selectedBackground.previewPath}`}
                 alt="背景"
                 className="absolute inset-0 w-full h-full object-cover"
               />

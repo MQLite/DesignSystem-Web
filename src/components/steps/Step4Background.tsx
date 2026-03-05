@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react'
 import type { WizardState, BackgroundDto } from '../../types'
 import { getBackgrounds } from '../../api/client'
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'https://localhost:7001'
+
+function assetUrl(path: string | null): string | null {
+  if (!path) return null
+  return `${API_BASE}/${path}`
+}
+
 interface Props {
   state: WizardState
   update: (patch: Partial<WizardState>) => void
@@ -32,7 +39,7 @@ function BackgroundCard({
       <div className="relative bg-gray-100 aspect-[3/4] w-full overflow-hidden">
         {bg.previewPath && !imgErr ? (
           <img
-            src={`/${bg.previewPath}`}
+            src={assetUrl(bg.previewPath)!}
             alt={bg.name}
             className="w-full h-full object-cover"
             onError={() => setImgErr(true)}
