@@ -100,9 +100,12 @@ export default function Step4Background({ state, update }: Props) {
       .finally(() => setLoading(false))
   }, [])
 
-  const filtered = state.occasionType
-    ? backgrounds.filter((b) => b.occasionType === state.occasionType)
-    : backgrounds
+  // We use all backgrounds for simplicity, but you can enable filtering by occasion type if needed
+  const filtered = backgrounds
+  
+  // const filtered = state.occasionType
+  //   ? backgrounds.filter((b) => b.occasionType === state.occasionType)
+  //   : backgrounds
 
   const handleSelect = (bg: BackgroundDto) => {
     const layout = bg.layout.find((l) => l.sizeCode === state.sizeCode) ?? bg.layout[0]
