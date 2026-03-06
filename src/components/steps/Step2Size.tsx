@@ -1,14 +1,10 @@
+import { useTranslation } from 'react-i18next'
 import type { WizardState, SizeCode } from '../../types'
 
 interface Props {
   state: WizardState
   update: (patch: Partial<WizardState>) => void
 }
-
-const sizes: { code: SizeCode; label: string; mm: string; desc: string }[] = [
-  { code: 'A3', label: 'A3', mm: '297 × 420 mm', desc: '大尺寸，适合展架、展台、礼堂布置' },
-  { code: 'A4', label: 'A4', mm: '210 × 297 mm', desc: '标准尺寸，适合桌摆、相框、小型展示' },
-]
 
 function SizePreview({ code }: { code: SizeCode }) {
   const isA3 = code === 'A3'
@@ -26,9 +22,16 @@ function SizePreview({ code }: { code: SizeCode }) {
 }
 
 export default function Step2Size({ state, update }: Props) {
+  const { t } = useTranslation()
+
+  const sizes: { code: SizeCode; label: string; mm: string; desc: string }[] = [
+    { code: 'A3', label: t('step2.a3.label'), mm: t('step2.a3.mm'), desc: t('step2.a3.desc') },
+    { code: 'A4', label: t('step2.a4.label'), mm: t('step2.a4.mm'), desc: t('step2.a4.desc') },
+  ]
+
   return (
     <div className="max-w-xl">
-      <p className="text-gray-500 text-sm mb-6">选择设计尺寸，将决定背景模板和布局比例。</p>
+      <p className="text-gray-500 text-sm mb-6">{t('step2.hint')}</p>
       <div className="grid grid-cols-2 gap-4">
         {sizes.map((s) => {
           const selected = state.sizeCode === s.code
@@ -47,7 +50,7 @@ export default function Step2Size({ state, update }: Props) {
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold text-gray-900 text-lg">{s.label}</h3>
                   {selected && (
-                    <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full">已选</span>
+                    <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full">{t('common.selected')}</span>
                   )}
                 </div>
                 <p className="text-xs font-mono text-gray-400 mt-0.5">{s.mm}</p>

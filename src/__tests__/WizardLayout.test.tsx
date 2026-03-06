@@ -1,9 +1,18 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
+import i18n from '../i18n'
 import WizardLayout from '../components/WizardLayout'
 
-const STEPS = ['产品类型', '尺寸选择', '场合主题', '背景模板']
+const { t } = i18n
+
+// Use translated step labels matching App.tsx
+const STEPS = [
+  t('steps.productType'),
+  t('steps.size'),
+  t('steps.occasion'),
+  t('steps.background'),
+]
 
 function setup({
   step = 1,
@@ -22,50 +31,49 @@ function setup({
 describe('WizardLayout', () => {
   it('renders the active step label in the header', () => {
     setup({ step: 2 })
-    // Header h2 shows the current step label
-    expect(screen.getAllByText('尺寸选择').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(t('steps.size')).length).toBeGreaterThan(0)
   })
 
   it('shows step progress as "步骤 N / total"', () => {
     setup({ step: 3 })
-    expect(screen.getByText('步骤 3 / 4')).toBeInTheDocument()
+    expect(screen.getByText(t('nav.stepOf', { current: 3, total: 4 }))).toBeInTheDocument()
   })
 
   it('Back button is disabled on first step', () => {
     setup({ step: 1 })
-    expect(screen.getByText('← 上一步')).toBeDisabled()
+    expect(screen.getByText(t('nav.back'))).toBeDisabled()
   })
 
   it('Back button is enabled after first step', () => {
     setup({ step: 2 })
-    expect(screen.getByText('← 上一步')).not.toBeDisabled()
+    expect(screen.getByText(t('nav.back'))).not.toBeDisabled()
   })
 
   it('Next button is disabled when canNext=false', () => {
     setup({ canNext: false })
-    expect(screen.getByText('下一步 →')).toBeDisabled()
+    expect(screen.getByText(t('nav.next'))).toBeDisabled()
   })
 
   it('Next button is enabled when canNext=true', () => {
     setup({ canNext: true })
-    expect(screen.getByText('下一步 →')).not.toBeDisabled()
+    expect(screen.getByText(t('nav.next'))).not.toBeDisabled()
   })
 
   it('clicking Next calls onNext', async () => {
     const { onNext } = setup({ canNext: true })
-    await userEvent.click(screen.getByText('下一步 →'))
+    await userEvent.click(screen.getByText(t('nav.next')))
     expect(onNext).toHaveBeenCalledOnce()
   })
 
   it('clicking Back calls onBack', async () => {
     const { onBack } = setup({ step: 2 })
-    await userEvent.click(screen.getByText('← 上一步'))
+    await userEvent.click(screen.getByText(t('nav.back')))
     expect(onBack).toHaveBeenCalledOnce()
   })
 
   it('Next button is absent on last step', () => {
     setup({ step: STEPS.length })
-    expect(screen.queryByText('下一步 →')).not.toBeInTheDocument()
+    expect(screen.queryByText(t('nav.next'))).not.toBeInTheDocument()
   })
 
   it('renders children content', () => {

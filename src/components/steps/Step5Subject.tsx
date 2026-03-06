@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { WizardState } from '../../types'
 import { uploadSubject } from '../../api/client'
 
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function Step5Subject({ state, update }: Props) {
+  const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -15,7 +17,7 @@ export default function Step5Subject({ state, update }: Props) {
 
   const handleFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      setError('请选择图片文件（JPG / PNG / WEBP）')
+      setError(t('step5.invalidFileType'))
       return
     }
     setError(null)
@@ -52,9 +54,7 @@ export default function Step5Subject({ state, update }: Props) {
 
   return (
     <div className="max-w-xl">
-      <p className="text-gray-500 text-sm mb-6">
-        上传主体照片（人物 / 团体照）。系统将自动抠图并融合至背景模板中。
-      </p>
+      <p className="text-gray-500 text-sm mb-6">{t('step5.hint')}</p>
 
       {state.subjectPreviewUrl ? (
         /* Preview after upload */
@@ -75,17 +75,17 @@ export default function Step5Subject({ state, update }: Props) {
                   />
                 </svg>
               </span>
-              <span className="font-medium text-gray-900">上传成功</span>
+              <span className="font-medium text-gray-900">{t('step5.uploadSuccess')}</span>
             </div>
             <p className="text-xs text-gray-400 font-mono mb-3">ID: {state.subjectAssetId}</p>
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 mb-4">
-              PoC 阶段：抠图 &amp; 颜色调整功能待接入 AI 服务
+              {t('step5.pocNote')}
             </div>
             <button
               onClick={reset}
               className="text-sm text-gray-500 underline hover:text-gray-700"
             >
-              重新上传
+              {t('step5.reupload')}
             </button>
           </div>
         </div>
@@ -108,7 +108,7 @@ export default function Step5Subject({ state, update }: Props) {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
-              <span className="text-sm font-medium">上传中…</span>
+              <span className="text-sm font-medium">{t('step5.uploading')}</span>
             </div>
           ) : (
             <>
@@ -125,8 +125,8 @@ export default function Step5Subject({ state, update }: Props) {
                   d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                 />
               </svg>
-              <p className="font-medium text-gray-700">拖放图片至此，或点击选择</p>
-              <p className="text-sm text-gray-400 mt-1">支持 JPG · PNG · WEBP，最大 20 MB</p>
+              <p className="font-medium text-gray-700">{t('step5.dropHint')}</p>
+              <p className="text-sm text-gray-400 mt-1">{t('step5.formatHint')}</p>
             </>
           )}
         </div>
@@ -149,9 +149,9 @@ export default function Step5Subject({ state, update }: Props) {
       {/* Adjustment controls placeholder */}
       {state.subjectPreviewUrl && (
         <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
-          <h3 className="font-medium text-gray-800 mb-4 text-sm">颜色 &amp; 风格调整</h3>
+          <h3 className="font-medium text-gray-800 mb-4 text-sm">{t('step5.adjustments')}</h3>
           <div className="space-y-4 opacity-50 pointer-events-none">
-            {['亮度', '对比度', '饱和度'].map((label) => (
+            {[t('step5.brightness'), t('step5.contrast'), t('step5.saturation')].map((label) => (
               <div key={label} className="flex items-center gap-4">
                 <span className="text-sm text-gray-600 w-16">{label}</span>
                 <input type="range" min={-100} max={100} defaultValue={0} className="flex-1" />
@@ -159,7 +159,7 @@ export default function Step5Subject({ state, update }: Props) {
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-400 mt-3">* 调整功能在 PoC 阶段暂未实现</p>
+          <p className="text-xs text-gray-400 mt-3">{t('step5.adjustmentNote')}</p>
         </div>
       )}
     </div>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { WizardState, ProductType } from '../../types'
 
 interface Props {
@@ -5,34 +6,36 @@ interface Props {
   update: (patch: Partial<WizardState>) => void
 }
 
-const products: { type: ProductType; label: string; desc: string; dims: string; icon: string }[] = [
-  {
-    type: 'TShirt',
-    label: 'T恤',
-    desc: '纪念T恤设计，适合聚会、纪念活动',
-    dims: '正面约 30 × 40 cm',
-    icon: '👕',
-  },
-  {
-    type: 'PullUpBanner',
-    label: 'Pull-up Banner',
-    desc: '展架海报，适合现场展示、签到台',
-    dims: '80 × 200 cm（标准展架）',
-    icon: '🪧',
-  },
-  {
-    type: 'PvcBanner',
-    label: 'PVC Banner',
-    desc: '户外横幅，适合门口挂幅、围栏展示',
-    dims: 'A3 / A4 可选',
-    icon: '📋',
-  },
-]
-
 export default function Step1ProductType({ state, update }: Props) {
+  const { t } = useTranslation()
+
+  const products: { type: ProductType; label: string; desc: string; dims: string; icon: string }[] = [
+    {
+      type: 'TShirt',
+      label: t('step1.tshirt.label'),
+      desc: t('step1.tshirt.desc'),
+      dims: t('step1.tshirt.dims'),
+      icon: t('step1.tshirt.icon'),
+    },
+    {
+      type: 'PullUpBanner',
+      label: t('step1.pullUpBanner.label'),
+      desc: t('step1.pullUpBanner.desc'),
+      dims: t('step1.pullUpBanner.dims'),
+      icon: t('step1.pullUpBanner.icon'),
+    },
+    {
+      type: 'PvcBanner',
+      label: t('step1.pvcBanner.label'),
+      desc: t('step1.pvcBanner.desc'),
+      dims: t('step1.pvcBanner.dims'),
+      icon: t('step1.pvcBanner.icon'),
+    },
+  ]
+
   return (
     <div className="max-w-2xl">
-      <p className="text-gray-500 text-sm mb-6">选择您需要制作的纪念品类型，后续步骤将根据此选择调整。</p>
+      <p className="text-gray-500 text-sm mb-6">{t('step1.hint')}</p>
       <div className="grid grid-cols-1 gap-4">
         {products.map((p) => {
           const selected = state.productType === p.type
@@ -51,7 +54,7 @@ export default function Step1ProductType({ state, update }: Props) {
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold text-gray-900">{p.label}</h3>
                   {selected && (
-                    <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full">已选</span>
+                    <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full">{t('common.selected')}</span>
                   )}
                 </div>
                 <p className="text-sm text-gray-500 mt-0.5">{p.desc}</p>

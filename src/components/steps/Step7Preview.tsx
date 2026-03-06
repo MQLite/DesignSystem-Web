@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { WizardState } from '../../types'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'https://localhost:7001'
@@ -6,18 +7,6 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'h
 interface Props {
   state: WizardState
   update: (patch: Partial<WizardState>) => void
-}
-
-const PRODUCT_LABELS: Record<string, string> = {
-  TShirt: 'T恤',
-  PullUpBanner: 'Pull-up Banner',
-  PvcBanner: 'PVC Banner',
-}
-
-const OCCASION_LABELS: Record<string, string> = {
-  Funeral: '殡仪 / 追思',
-  Birthday: '生日 / 庆典',
-  Others: '其他场合',
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
@@ -53,6 +42,7 @@ function ExportButton({
 }
 
 export default function Step7Preview({ state }: Props) {
+  const { t } = useTranslation()
   const [toastMsg, setToastMsg] = useState<string | null>(null)
 
   const showToast = (msg: string) => {
@@ -65,9 +55,7 @@ export default function Step7Preview({ state }: Props) {
 
   return (
     <div className="max-w-3xl">
-      <p className="text-gray-500 text-sm mb-6">
-        确认以下设计配置，然后导出成品文件。
-      </p>
+      <p className="text-gray-500 text-sm mb-6">{t('step7.hint')}</p>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Left: Canvas preview */}
@@ -118,60 +106,58 @@ export default function Step7Preview({ state }: Props) {
 
             {/* PoC watermark */}
             <div className="absolute top-2 left-2 bg-black/40 text-white text-xs px-2 py-0.5 rounded">
-              PoC 预览
+              {t('step7.pocPreview')}
             </div>
           </div>
 
-          <p className="text-xs text-gray-400 text-center mt-2">
-            * 实际输出质量以导出文件为准，此处为示意预览
-          </p>
+          <p className="text-xs text-gray-400 text-center mt-2">{t('step7.previewNote')}</p>
         </div>
 
         {/* Right: Summary + Export */}
         <div className="lg:col-span-2 space-y-4">
           {/* Summary */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="font-semibold text-gray-900 text-sm mb-3">设计配置</h3>
-            <SummaryRow label="产品类型" value={PRODUCT_LABELS[productType ?? ''] ?? '—'} />
-            <SummaryRow label="尺寸" value={sizeCode ?? '—'} />
-            <SummaryRow label="场合" value={OCCASION_LABELS[occasionType ?? ''] ?? '—'} />
-            <SummaryRow label="背景模板" value={selectedBackground?.name ?? '—'} />
-            <SummaryRow label="主体照片" value={subjectPreviewUrl ? '已上传 ✓' : '未上传'} />
-            <SummaryRow label="主标题" value={textConfig.title || '—'} />
+            <h3 className="font-semibold text-gray-900 text-sm mb-3">{t('step7.configTitle')}</h3>
+            <SummaryRow label={t('step7.configProductType')} value={productType ? t(`step7.products.${productType}`) : '—'} />
+            <SummaryRow label={t('step7.configSize')} value={sizeCode ?? '—'} />
+            <SummaryRow label={t('step7.configOccasion')} value={occasionType ? t(`step7.occasions.${occasionType}`) : '—'} />
+            <SummaryRow label={t('step7.configBackground')} value={selectedBackground?.name ?? '—'} />
+            <SummaryRow label={t('step7.configSubject')} value={subjectPreviewUrl ? t('step7.subjectUploaded') : t('step7.subjectNone')} />
+            <SummaryRow label={t('step7.configMainTitle')} value={textConfig.title || '—'} />
           </div>
 
           {/* Export */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="font-semibold text-gray-900 text-sm mb-1">导出文件</h3>
-            <p className="text-xs text-gray-400 mb-4">PoC 阶段：导出功能待实现</p>
+            <h3 className="font-semibold text-gray-900 text-sm mb-1">{t('step7.exportTitle')}</h3>
+            <p className="text-xs text-gray-400 mb-4">{t('step7.exportPocNote')}</p>
             <div className="flex gap-3">
               <ExportButton
                 icon="🎨"
-                label="PSD"
-                sub="分层源文件"
-                onClick={() => showToast('PSD 导出功能待实现')}
+                label={t('step7.psd.label')}
+                sub={t('step7.psd.sub')}
+                onClick={() => showToast(t('step7.psdToast'))}
               />
               <ExportButton
                 icon="📄"
-                label="PDF"
-                sub="印刷就绪"
-                onClick={() => showToast('PDF 导出功能待实现')}
+                label={t('step7.pdf.label')}
+                sub={t('step7.pdf.sub')}
+                onClick={() => showToast(t('step7.pdfToast'))}
               />
               <ExportButton
                 icon="🖼️"
-                label="PNG"
-                sub="高分辨率"
-                onClick={() => showToast('PNG 导出功能待实现')}
+                label={t('step7.png.label')}
+                sub={t('step7.png.sub')}
+                onClick={() => showToast(t('step7.pngToast'))}
               />
             </div>
           </div>
 
           {/* Generate button */}
           <button
-            onClick={() => showToast('AI 合成功能待接入，PoC 仅展示流程')}
+            onClick={() => showToast(t('step7.generateToast'))}
             className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition-colors text-sm"
           >
-            生成设计稿
+            {t('step7.generateBtn')}
           </button>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { WizardState, OccasionType } from '../../types'
 
 interface Props {
@@ -5,48 +6,50 @@ interface Props {
   update: (patch: Partial<WizardState>) => void
 }
 
-const occasions: {
-  type: OccasionType
-  label: string
-  sublabel: string
-  desc: string
-  palette: string[]
-  bg: string
-  border: string
-}[] = [
-  {
-    type: 'Funeral',
-    label: '殡仪 / 追思',
-    sublabel: 'Funeral & Memorial',
-    desc: '庄重典雅的灰白色系，适合白事、追思会、葬礼场合',
-    palette: ['#1a1a1a', '#4a4a4a', '#8a8a8a', '#d4d4d4', '#f5f5f5'],
-    bg: 'bg-gray-50',
-    border: 'border-gray-400',
-  },
-  {
-    type: 'Birthday',
-    label: '生日 / 庆典',
-    sublabel: 'Birthday & Celebration',
-    desc: '温暖活泼的彩色系，适合生日宴会、周年纪念、开幕庆典',
-    palette: ['#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#22c55e'],
-    bg: 'bg-yellow-50',
-    border: 'border-yellow-400',
-  },
-  {
-    type: 'Others',
-    label: '其他场合',
-    sublabel: 'Others',
-    desc: '通用风格，适合毕业典礼、企业活动、社区聚会等',
-    palette: ['#3b82f6', '#6366f1', '#0ea5e9', '#14b8a6', '#64748b'],
-    bg: 'bg-blue-50',
-    border: 'border-blue-400',
-  },
-]
-
 export default function Step3Occasion({ state, update }: Props) {
+  const { t } = useTranslation()
+
+  const occasions: {
+    type: OccasionType
+    label: string
+    sublabel: string
+    desc: string
+    palette: string[]
+    bg: string
+    border: string
+  }[] = [
+    {
+      type: 'Funeral',
+      label: t('step3.funeral.label'),
+      sublabel: t('step3.funeral.sublabel'),
+      desc: t('step3.funeral.desc'),
+      palette: ['#1a1a1a', '#4a4a4a', '#8a8a8a', '#d4d4d4', '#f5f5f5'],
+      bg: 'bg-gray-50',
+      border: 'border-gray-400',
+    },
+    {
+      type: 'Birthday',
+      label: t('step3.birthday.label'),
+      sublabel: t('step3.birthday.sublabel'),
+      desc: t('step3.birthday.desc'),
+      palette: ['#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#22c55e'],
+      bg: 'bg-yellow-50',
+      border: 'border-yellow-400',
+    },
+    {
+      type: 'Others',
+      label: t('step3.others.label'),
+      sublabel: t('step3.others.sublabel'),
+      desc: t('step3.others.desc'),
+      palette: ['#3b82f6', '#6366f1', '#0ea5e9', '#14b8a6', '#64748b'],
+      bg: 'bg-blue-50',
+      border: 'border-blue-400',
+    },
+  ]
+
   return (
     <div className="max-w-2xl">
-      <p className="text-gray-500 text-sm mb-6">选择场合主题，系统将筛选对应风格的背景模板。</p>
+      <p className="text-gray-500 text-sm mb-6">{t('step3.hint')}</p>
       <div className="grid grid-cols-1 gap-4">
         {occasions.map((o) => {
           const selected = state.occasionType === o.type
@@ -69,7 +72,7 @@ export default function Step3Occasion({ state, update }: Props) {
                     <span className="text-xs text-gray-400">{o.sublabel}</span>
                     {selected && (
                       <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-auto">
-                        已选
+                        {t('common.selected')}
                       </span>
                     )}
                   </div>

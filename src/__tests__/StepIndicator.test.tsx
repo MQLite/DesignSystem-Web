@@ -1,8 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
+import i18n from '../i18n'
 import StepIndicator from '../components/StepIndicator'
 
-const STEPS = ['产品类型', '尺寸选择', '场合主题']
+const { t } = i18n
+
+const STEPS = [t('steps.productType'), t('steps.size'), t('steps.occasion')]
 
 describe('StepIndicator', () => {
   it('renders all step labels', () => {

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { WizardState } from './types'
 import WizardLayout from './components/WizardLayout'
 import Step1ProductType from './components/steps/Step1ProductType'
@@ -21,18 +22,19 @@ const INITIAL: WizardState = {
   textConfig: { title: '', subtitle: '', footer: '' },
 }
 
-const STEP_LABELS = [
-  '产品类型',
-  '尺寸选择',
-  '场合主题',
-  '背景模板',
-  '主体照片',
-  '文字配置',
-  '预览导出',
-]
-
 export default function App() {
+  const { t } = useTranslation()
   const [state, setState] = useState<WizardState>(INITIAL)
+
+  const stepLabels = [
+    t('steps.productType'),
+    t('steps.size'),
+    t('steps.occasion'),
+    t('steps.background'),
+    t('steps.subject'),
+    t('steps.textConfig'),
+    t('steps.preview'),
+  ]
 
   const update = (patch: Partial<WizardState>) =>
     setState((s) => ({ ...s, ...patch }))
@@ -65,7 +67,7 @@ export default function App() {
   return (
     <WizardLayout
       step={state.step}
-      steps={STEP_LABELS}
+      steps={stepLabels}
       onNext={next}
       onBack={back}
       canNext={canNext()}

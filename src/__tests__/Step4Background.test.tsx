@@ -1,8 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import i18n from '../i18n'
 import Step4Background from '../components/steps/Step4Background'
 import type { WizardState, BackgroundDto } from '../types'
+
+const { t } = i18n
 
 // Mock the API client module — intercepted wherever the component imports it
 vi.mock('../api/client', () => ({
@@ -32,7 +35,7 @@ const MOCK_BG: BackgroundDto = {
       sizeCode: 'A3',
       orientation: 'Portrait',
       subjectSlotsJson: '[{"x":0.25,"y":0.15,"w":0.50,"h":0.60}]',
-      textZonesJson: null,
+      textZonesJson: '',
       version: 1,
     },
   ],
@@ -47,14 +50,14 @@ describe('Step4Background', () => {
     // Promise that never resolves = perpetual loading state
     mockGetBackgrounds.mockReturnValue(new Promise(() => {}))
     render(<Step4Background state={BASE} update={() => {}} />)
-    expect(screen.getByText('加载背景模板中…')).toBeInTheDocument()
+    expect(screen.getByText(t('step4.loading'))).toBeInTheDocument()
   })
 
   it('shows error panel when API call fails', async () => {
     mockGetBackgrounds.mockRejectedValue(new Error('Network error'))
     render(<Step4Background state={BASE} update={() => {}} />)
     await waitFor(() =>
-      expect(screen.getByText('无法加载背景模板')).toBeInTheDocument(),
+      expect(screen.getByText(t('step4.errorTitle'))).toBeInTheDocument(),
     )
     expect(screen.getByText('Network error')).toBeInTheDocument()
   })
@@ -76,7 +79,8 @@ describe('Step4Background', () => {
   it('shows template count in header', async () => {
     mockGetBackgrounds.mockResolvedValue([MOCK_BG])
     render(<Step4Background state={BASE} update={() => {}} />)
-    await waitFor(() => expect(screen.getByText(/1 个模板/)).toBeInTheDocument())
+    // Count text is part of a longer paragraph — use regex to match the substring
+    await waitFor(() => expect(screen.getByText(new RegExp(t('step4.count', { count: 1 })))).toBeInTheDocument())
   })
 
   it('clicking a card calls update with selected background', async () => {
