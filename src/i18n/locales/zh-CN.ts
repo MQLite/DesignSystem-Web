@@ -1,4 +1,16 @@
 const zhCN = {
+  canvas: {
+    layers: '图层',
+    layer: {
+      background: '背景',
+      subject: '人物',
+      text: '文字',
+    },
+    scale: '缩放',
+    rotation: '旋转',
+    reset: '重置图层',
+  },
+
   app: {
     title: 'Design Studio',
     subtitle: '纪念品设计系统',

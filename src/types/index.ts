@@ -26,6 +26,31 @@ export interface TextConfig {
   footer: string
 }
 
+export interface LayerTransform {
+  /** Horizontal offset as fraction of canvas width (0 = no offset from default position) */
+  x: number
+  /** Vertical offset as fraction of canvas height (0 = no offset from default position) */
+  y: number
+  /** Size multiplier (1.0 = 100%) */
+  scale: number
+  /** Rotation in degrees */
+  rotation: number
+}
+
+export interface CanvasLayout {
+  background: LayerTransform
+  subject: LayerTransform
+  text: LayerTransform
+}
+
+export const DEFAULT_LAYER: LayerTransform = { x: 0, y: 0, scale: 1.0, rotation: 0 }
+
+export const DEFAULT_CANVAS_LAYOUT: CanvasLayout = {
+  background: { ...DEFAULT_LAYER },
+  subject: { ...DEFAULT_LAYER },
+  text: { ...DEFAULT_LAYER },
+}
+
 export interface WizardState {
   step: number
   productType: ProductType | null
@@ -33,8 +58,9 @@ export interface WizardState {
   occasionType: OccasionType | null
   selectedBackground: BackgroundDto | null
   selectedLayoutId: string | null
-  customBackgroundUrl: string | null   // blob URL for user-uploaded background
+  customBackgroundUrl: string | null
   subjectAssetId: string | null
   subjectPreviewUrl: string | null
   textConfig: TextConfig
+  canvasLayout: CanvasLayout
 }

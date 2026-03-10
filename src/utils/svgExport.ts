@@ -1,5 +1,6 @@
 import { parse as parseFont } from 'opentype.js'
 import type { Font } from 'opentype.js'
+import type { CanvasLayout, LayerTransform } from '../types'
 
 // ─── Canvas dimensions (pt at 72 dpi, matching standard PDF page sizes) ───────
 const CANVAS: Record<string, [number, number]> = {
@@ -26,7 +27,6 @@ async function urlToDataUri(url: string): Promise<string | null> {
   }
 
   // Fallback: draw via HTMLImageElement → Canvas → toDataURL
-  // Works when CORS header is present on the image response; blob: URLs are always fine.
   return new Promise<string | null>((resolve) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
@@ -70,7 +70,7 @@ function esc(text: string): string {
 // ─── Build text SVG elements (paths or <text> fallback) ──────────────────────
 interface TextLine {
   content: string
-  y: number          // absolute y in canvas coords
+  y: number
   fontSize: number
   fill: string
   fontWeight?: string
@@ -92,7 +92,6 @@ function buildTextLayer(lines: TextLine[], W: number, font: Font | null): { svg:
     return { svg: paths, curved: true }
   }
 
-  // Fallback: SVG <text> elements
   const texts = lines
     .filter((l) => l.content.trim())
     .map(
@@ -105,6 +104,14 @@ function buildTextLayer(lines: TextLine[], W: number, font: Font | null): { svg:
   return { svg: texts, curved: false }
 }
 
+// ─── Build SVG transform attribute replicating CSS transform-origin: cx cy ───
+function svgLayerTransform(l: LayerTransform, tx: number, ty: number, cx: number, cy: number): string {
+  // Equivalent of: translate(tx,ty) scale(s) rotate(r) with transform-origin (cx,cy)
+  // = translate(cx+tx, cy+ty) rotate(r) scale(s) translate(-cx,-cy)
+  if (l.rotation === 0 && l.scale === 1) return `translate(${tx} ${ty})`
+  return `translate(${cx + tx} ${cy + ty}) rotate(${l.rotation}) scale(${l.scale}) translate(${-cx} ${-cy})`
+}
+
 // ─── Public export options ────────────────────────────────────────────────────
 export interface SvgExportOptions {
   backgroundUrl: string | null
@@ -113,6 +120,8 @@ export interface SvgExportOptions {
   subtitle: string
   footer: string
   sizeCode: string | null
+  /** Canvas layout from the interactive preview */
+  canvasLayout?: CanvasLayout
   /** URL to a TTF/OTF font file for text-to-path conversion, e.g. '/fonts/NotoSansSC-Regular.ttf' */
   fontUrl?: string
 }
@@ -126,6 +135,10 @@ export async function exportSvg(opts: SvgExportOptions): Promise<SvgExportResult
   const { backgroundUrl, subjectUrl, title, subtitle, footer, sizeCode } = opts
   const [W, H] = CANVAS[sizeCode ?? 'A4']
 
+  const bg = opts.canvasLayout?.background ?? { x: 0, y: 0, scale: 1, rotation: 0 }
+  const subj = opts.canvasLayout?.subject ?? { x: 0, y: 0, scale: 1, rotation: 0 }
+  const txt = opts.canvasLayout?.text ?? { x: 0, y: 0, scale: 1, rotation: 0 }
+
   // Load images in parallel
   const [bgData, subjectData] = await Promise.all([
     backgroundUrl ? urlToDataUri(backgroundUrl) : Promise.resolve(null),
@@ -135,17 +148,30 @@ export async function exportSvg(opts: SvgExportOptions): Promise<SvgExportResult
   // Try to load font for text-to-path
   const font = opts.fontUrl ? await tryLoadFont(opts.fontUrl) : null
 
-  // Subject placement — upper-center portion of the canvas
-  const subX = Math.round(W * 0.15)
-  const subY = Math.round(H * 0.10)
-  const subW = Math.round(W * 0.70)
-  const subH = Math.round(H * 0.58)
+  // Background transform (pivot = canvas center)
+  const bgTx = Math.round(bg.x * W)
+  const bgTy = Math.round(bg.y * H)
+  const bgTransform = svgLayerTransform(bg, bgTx, bgTy, W / 2, H / 2)
 
-  // Text block — bottom of the canvas
+  // Subject placement (pivot = subject center in canvas)
+  const subW = Math.round(W * 0.70 * subj.scale)
+  const subH = Math.round(H * 0.58 * subj.scale)
+  const subCx = Math.round(W / 2 + subj.x * W)
+  const subCy = Math.round(H / 2 + subj.y * H)
+  const subjectTransform = subj.rotation !== 0
+    ? `translate(${subCx} ${subCy}) rotate(${subj.rotation}) translate(${-subCx} ${-subCy})`
+    : ''
+
+  // Text block — bottom of canvas, with optional transform
+  const textBaseY = H - Math.round(H * 0.22)   // approx center of text block
+  const txtTx = Math.round(txt.x * W)
+  const txtTy = Math.round(txt.y * H)
+  const textGroupTransform = svgLayerTransform(txt, txtTx, txtTy, W / 2, textBaseY)
+
   const textLines: TextLine[] = [
-    { content: title, y: H - Math.round(H * 0.13), fontSize: Math.round(W * 0.058), fill: 'white', fontWeight: 'bold' },
+    { content: title,    y: H - Math.round(H * 0.13), fontSize: Math.round(W * 0.058), fill: 'white', fontWeight: 'bold' },
     { content: subtitle, y: H - Math.round(H * 0.08), fontSize: Math.round(W * 0.032), fill: 'rgba(255,255,255,0.85)' },
-    { content: footer, y: H - Math.round(H * 0.04), fontSize: Math.round(W * 0.022), fill: 'rgba(255,255,255,0.65)' },
+    { content: footer,   y: H - Math.round(H * 0.04), fontSize: Math.round(W * 0.022), fill: 'rgba(255,255,255,0.65)' },
   ]
 
   const { svg: textSvg, curved } = buildTextLayer(textLines, W, font)
@@ -165,7 +191,7 @@ export async function exportSvg(opts: SvgExportOptions): Promise<SvgExportResult
   </defs>
 
   <!-- Layer 1: Background -->
-  <g id="layer-background">
+  <g id="layer-background" transform="${bgTransform}">
 ${bgData
   ? `    <image xlink:href="${bgData}" href="${bgData}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
   : `    <rect width="${W}" height="${H}" fill="#e5e7eb"/>`}
@@ -177,14 +203,14 @@ ${bgData
   </g>
 
   <!-- Layer 3: Subject photo -->
-  <g id="layer-subject">
+  <g id="layer-subject"${subjectTransform ? ` transform="${subjectTransform}"` : ''}>
 ${subjectData
-  ? `    <image xlink:href="${subjectData}" href="${subjectData}" x="${subX}" y="${subY}" width="${subW}" height="${subH}" preserveAspectRatio="xMidYMid meet"/>`
+  ? `    <image xlink:href="${subjectData}" href="${subjectData}" x="${subCx - subW / 2}" y="${subCy - subH / 2}" width="${subW}" height="${subH}" preserveAspectRatio="xMidYMid meet"/>`
   : '    <!-- No subject photo uploaded -->'}
   </g>
 
-  <!-- Layer 4: Text${curved ? ' (converted to paths / 曲线化)' : ' (text elements — add font file for path conversion)'} -->
-  <g id="layer-text">
+  <!-- Layer 4: Text${curved ? ' (converted to paths / 曲线化)' : ' (text elements)'} -->
+  <g id="layer-text" transform="${textGroupTransform}">
     ${textSvg}
   </g>
 

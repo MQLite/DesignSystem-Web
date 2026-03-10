@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { WizardState } from './types'
+import { DEFAULT_CANVAS_LAYOUT } from './types'
 import WizardLayout from './components/WizardLayout'
 import Step1ProductType from './components/steps/Step1ProductType'
 import Step2Size from './components/steps/Step2Size'
@@ -21,6 +22,7 @@ const INITIAL: WizardState = {
   subjectAssetId: null,
   subjectPreviewUrl: null,
   textConfig: { title: '', subtitle: '', footer: '' },
+  canvasLayout: DEFAULT_CANVAS_LAYOUT,
 }
 
 export default function App() {

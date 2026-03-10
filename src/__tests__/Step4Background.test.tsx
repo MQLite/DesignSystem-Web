@@ -21,6 +21,7 @@ const BASE: WizardState = {
   selectedBackground: null, selectedLayoutId: null, customBackgroundUrl: null,
   subjectAssetId: null, subjectPreviewUrl: null,
   textConfig: { title: '', subtitle: '', footer: '' },
+  canvasLayout: { background: { x: 0, y: 0, scale: 1, rotation: 0 }, subject: { x: 0, y: 0, scale: 1, rotation: 0 }, text: { x: 0, y: 0, scale: 1, rotation: 0 } },
 }
 
 const MOCK_BG: BackgroundDto = {

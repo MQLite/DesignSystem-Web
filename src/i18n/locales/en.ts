@@ -1,4 +1,16 @@
 const en = {
+  canvas: {
+    layers: 'Layers',
+    layer: {
+      background: 'Background',
+      subject: 'Subject',
+      text: 'Text',
+    },
+    scale: 'Scale',
+    rotation: 'Rotation',
+    reset: 'Reset Layer',
+  },
+
   app: {
     title: 'Design Studio',
     subtitle: 'Memorial Product Designer',
