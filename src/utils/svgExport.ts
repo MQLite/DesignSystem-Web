@@ -9,18 +9,41 @@ const CANVAS: Record<string, [number, number]> = {
 
 // ─── Convert any URL (blob: or http:) to a base64 data URI ───────────────────
 async function urlToDataUri(url: string): Promise<string | null> {
+  // Primary: fetch + FileReader (works for blob: URLs and CORS-enabled remote URLs)
   try {
     const res = await fetch(url)
-    const blob = await res.blob()
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result as string)
-      reader.onerror = reject
-      reader.readAsDataURL(blob)
-    })
+    if (res.ok) {
+      const blob = await res.blob()
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+    }
   } catch {
-    return null
+    // fall through to canvas fallback
   }
+
+  // Fallback: draw via HTMLImageElement → Canvas → toDataURL
+  // Works when CORS header is present on the image response; blob: URLs are always fine.
+  return new Promise<string | null>((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth || 1
+        canvas.height = img.naturalHeight || 1
+        canvas.getContext('2d')!.drawImage(img, 0, 0)
+        resolve(canvas.toDataURL('image/png'))
+      } catch {
+        resolve(null)
+      }
+    }
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
 }
 
 // ─── Try to load a TTF/OTF font for text-to-path conversion ──────────────────
@@ -144,7 +167,7 @@ export async function exportSvg(opts: SvgExportOptions): Promise<SvgExportResult
   <!-- Layer 1: Background -->
   <g id="layer-background">
 ${bgData
-  ? `    <image href="${bgData}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
+  ? `    <image xlink:href="${bgData}" href="${bgData}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
   : `    <rect width="${W}" height="${H}" fill="#e5e7eb"/>`}
   </g>
 
@@ -156,7 +179,7 @@ ${bgData
   <!-- Layer 3: Subject photo -->
   <g id="layer-subject">
 ${subjectData
-  ? `    <image href="${subjectData}" x="${subX}" y="${subY}" width="${subW}" height="${subH}" preserveAspectRatio="xMidYMid meet"/>`
+  ? `    <image xlink:href="${subjectData}" href="${subjectData}" x="${subX}" y="${subY}" width="${subW}" height="${subH}" preserveAspectRatio="xMidYMid meet"/>`
   : '    <!-- No subject photo uploaded -->'}
   </g>
 
