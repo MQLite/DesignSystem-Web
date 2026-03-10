@@ -2,8 +2,6 @@ import { useTranslation } from 'react-i18next'
 import type { WizardState, TextConfig } from '../../types'
 import DesignCanvas from '../DesignCanvas'
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'https://localhost:7001'
-
 interface Props {
   state: WizardState
   update: (patch: Partial<WizardState>) => void
@@ -62,7 +60,7 @@ export default function Step6TextConfig({ state, update }: Props) {
   const patch = (p: Partial<TextConfig>) => update({ textConfig: { ...tc, ...p } })
 
   const effectiveBgUrl = customBackgroundUrl
-    ?? (selectedBackground?.previewPath ? `${API_BASE}/${selectedBackground.previewPath}` : null)
+    ?? (selectedBackground?.previewPath ? `/${selectedBackground.previewPath}` : null)
 
   return (
     <div className="max-w-5xl">

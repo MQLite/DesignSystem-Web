@@ -4,8 +4,6 @@ import type { WizardState } from '../../types'
 import { exportSvg } from '../../utils/svgExport'
 import DesignCanvas from '../DesignCanvas'
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'https://localhost:7001'
-
 interface Props {
   state: WizardState
   update: (patch: Partial<WizardState>) => void
@@ -57,7 +55,7 @@ export default function Step7Preview({ state, update }: Props) {
     customBackgroundUrl, canvasLayout } = state
 
   const effectiveBgUrl = customBackgroundUrl
-    ?? (selectedBackground?.previewPath ? `${API_BASE}/${selectedBackground.previewPath}` : null)
+    ?? (selectedBackground?.previewPath ? `/${selectedBackground.previewPath}` : null)
 
   const handleSvgExport = async () => {
     setSvgExporting(true)
