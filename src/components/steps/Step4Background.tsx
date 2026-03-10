@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { WizardState, BackgroundDto } from '../../types'
 import { getBackgrounds } from '../../api/client'
@@ -88,6 +88,68 @@ function BackgroundCard({
   )
 }
 
+function CustomUploadZone({ state, update }: { state: WizardState; update: (p: Partial<WizardState>) => void }) {
+  const { t } = useTranslation()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [dragging, setDragging] = useState(false)
+
+  const handleFile = (file: File) => {
+    if (!file.type.startsWith('image/')) return
+    // Revoke previous blob URL to avoid memory leaks
+    if (state.customBackgroundUrl) URL.revokeObjectURL(state.customBackgroundUrl)
+    const url = URL.createObjectURL(file)
+    update({ customBackgroundUrl: url, selectedBackground: null, selectedLayoutId: null })
+  }
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) handleFile(file)
+  }
+
+  if (state.customBackgroundUrl) {
+    return (
+      <div className="mb-5 rounded-xl border-2 border-indigo-500 overflow-hidden flex items-center gap-4 bg-indigo-50 p-3">
+        <img
+          src={state.customBackgroundUrl}
+          alt="custom bg"
+          className="w-16 h-20 object-cover rounded-lg flex-shrink-0"
+        />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-indigo-700">{t('step4.customSelected')}</p>
+        </div>
+        <button
+          onClick={() => inputRef.current?.click()}
+          className="text-xs text-indigo-600 underline flex-shrink-0"
+        >
+          {t('step4.customReplace')}
+        </button>
+        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={onDrop}
+      onClick={() => inputRef.current?.click()}
+      className={`mb-5 cursor-pointer rounded-xl border-2 border-dashed p-6 flex items-center gap-4 transition-colors ${
+        dragging ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
+      }`}
+    >
+      <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-xl">🖼️</div>
+      <div>
+        <p className="font-medium text-gray-700 text-sm">{t('step4.customUpload')}</p>
+        <p className="text-xs text-gray-400 mt-0.5">{t('step4.customUploadHint')}</p>
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+    </div>
+  )
+}
+
 export default function Step4Background({ state, update }: Props) {
   const { t } = useTranslation()
   const [backgrounds, setBackgrounds] = useState<BackgroundDto[]>([])
@@ -103,16 +165,11 @@ export default function Step4Background({ state, update }: Props) {
       .finally(() => setLoading(false))
   }, [])
 
-  // We use all backgrounds for simplicity, but you can enable filtering by occasion type if needed
   const filtered = backgrounds
-  
-  // const filtered = state.occasionType
-  //   ? backgrounds.filter((b) => b.occasionType === state.occasionType)
-  //   : backgrounds
 
   const handleSelect = (bg: BackgroundDto) => {
     const layout = bg.layout.find((l) => l.sizeCode === state.sizeCode) ?? bg.layout[0]
-    update({ selectedBackground: bg, selectedLayoutId: layout?.id ?? null })
+    update({ selectedBackground: bg, selectedLayoutId: layout?.id ?? null, customBackgroundUrl: null })
   }
 
   if (loading) {
@@ -141,6 +198,8 @@ export default function Step4Background({ state, update }: Props) {
 
   return (
     <div>
+      <CustomUploadZone state={state} update={update} />
+
       <div className="flex items-center justify-between mb-5">
         <p className="text-gray-500 text-sm">
           {state.occasionType ? t('step4.filterLabel') + state.occasionType : t('step4.all')} · {t('step4.count', { count: filtered.length })}

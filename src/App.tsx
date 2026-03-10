@@ -17,6 +17,7 @@ const INITIAL: WizardState = {
   occasionType: null,
   selectedBackground: null,
   selectedLayoutId: null,
+  customBackgroundUrl: null,
   subjectAssetId: null,
   subjectPreviewUrl: null,
   textConfig: { title: '', subtitle: '', footer: '' },
@@ -47,7 +48,7 @@ export default function App() {
       case 1: return state.productType !== null
       case 2: return state.sizeCode !== null
       case 3: return state.occasionType !== null
-      case 4: return state.selectedBackground !== null
+      case 4: return state.selectedBackground !== null || state.customBackgroundUrl !== null
       case 5: return state.subjectAssetId !== null
       case 6: return state.textConfig.title.trim().length > 0
       default: return false

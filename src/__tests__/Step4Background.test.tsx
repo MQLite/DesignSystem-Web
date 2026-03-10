@@ -18,7 +18,7 @@ const mockGetBackgrounds = vi.mocked(getBackgrounds)
 
 const BASE: WizardState = {
   step: 4, productType: 'PvcBanner', sizeCode: 'A3', occasionType: 'Funeral',
-  selectedBackground: null, selectedLayoutId: null,
+  selectedBackground: null, selectedLayoutId: null, customBackgroundUrl: null,
   subjectAssetId: null, subjectPreviewUrl: null,
   textConfig: { title: '', subtitle: '', footer: '' },
 }

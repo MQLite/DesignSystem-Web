@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { WizardState } from '../../types'
+import { exportSvg } from '../../utils/svgExport'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'https://localhost:7001'
 
@@ -44,14 +45,39 @@ function ExportButton({
 export default function Step7Preview({ state }: Props) {
   const { t } = useTranslation()
   const [toastMsg, setToastMsg] = useState<string | null>(null)
+  const [svgExporting, setSvgExporting] = useState(false)
 
   const showToast = (msg: string) => {
     setToastMsg(msg)
-    setTimeout(() => setToastMsg(null), 3000)
+    setTimeout(() => setToastMsg(null), 4000)
   }
 
-  const { productType, sizeCode, occasionType, selectedBackground, textConfig, subjectPreviewUrl } =
+  const { productType, sizeCode, occasionType, selectedBackground, textConfig, subjectPreviewUrl, customBackgroundUrl } =
     state
+
+  // Effective background URL: custom upload takes priority over template
+  const effectiveBgUrl = customBackgroundUrl
+    ?? (selectedBackground?.previewPath ? `${API_BASE}/${selectedBackground.previewPath}` : null)
+
+  const handleSvgExport = async () => {
+    setSvgExporting(true)
+    try {
+      const result = await exportSvg({
+        backgroundUrl: effectiveBgUrl,
+        subjectUrl: subjectPreviewUrl,
+        title: textConfig.title,
+        subtitle: textConfig.subtitle,
+        footer: textConfig.footer,
+        sizeCode,
+        fontUrl: '/fonts/NotoSansSC-Regular.ttf',
+      })
+      showToast(result.textCurved ? t('step7.svgTextCurved') : t('step7.svgTextFallback'))
+    } catch (e) {
+      showToast((e as Error).message)
+    } finally {
+      setSvgExporting(false)
+    }
+  }
 
   return (
     <div className="max-w-3xl">
@@ -66,9 +92,9 @@ export default function Step7Preview({ state }: Props) {
             }`}
           >
             {/* Background layer */}
-            {selectedBackground?.previewPath ? (
+            {effectiveBgUrl ? (
               <img
-                src={`${API_BASE}/${selectedBackground.previewPath}`}
+                src={effectiveBgUrl}
                 alt="背景"
                 className="absolute inset-0 w-full h-full object-cover"
               />
@@ -149,7 +175,14 @@ export default function Step7Preview({ state }: Props) {
                 sub={t('step7.png.sub')}
                 onClick={() => showToast(t('step7.pngToast'))}
               />
+              <ExportButton
+                icon={svgExporting ? '⏳' : '📐'}
+                label={t('step7.svg.label')}
+                sub={svgExporting ? t('step7.svgExporting') : t('step7.svg.sub')}
+                onClick={svgExporting ? () => {} : handleSvgExport}
+              />
             </div>
+            <p className="text-xs text-gray-400 mt-3 leading-relaxed">{t('step7.svgFontHint')}</p>
           </div>
 
           {/* Generate button */}

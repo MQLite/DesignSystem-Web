@@ -10,7 +10,7 @@ const { t } = i18n
 
 const BASE: WizardState = {
   step: 6, productType: 'PvcBanner', sizeCode: 'A3', occasionType: 'Funeral',
-  selectedBackground: null, selectedLayoutId: null,
+  selectedBackground: null, selectedLayoutId: null, customBackgroundUrl: null,
   subjectAssetId: null, subjectPreviewUrl: null,
   textConfig: { title: '', subtitle: '', footer: '' },
 }

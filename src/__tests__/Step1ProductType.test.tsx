@@ -10,7 +10,7 @@ const { t } = i18n
 
 const BASE: WizardState = {
   step: 1, productType: null, sizeCode: null, occasionType: null,
-  selectedBackground: null, selectedLayoutId: null,
+  selectedBackground: null, selectedLayoutId: null, customBackgroundUrl: null,
   subjectAssetId: null, subjectPreviewUrl: null,
   textConfig: { title: '', subtitle: '', footer: '' },
 }

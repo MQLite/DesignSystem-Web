@@ -33,6 +33,7 @@ export interface WizardState {
   occasionType: OccasionType | null
   selectedBackground: BackgroundDto | null
   selectedLayoutId: string | null
+  customBackgroundUrl: string | null   // blob URL for user-uploaded background
   subjectAssetId: string | null
   subjectPreviewUrl: string | null
   textConfig: TextConfig
