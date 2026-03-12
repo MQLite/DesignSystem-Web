@@ -3,11 +3,9 @@ import { useTranslation } from 'react-i18next'
 import type { WizardState, BackgroundDto } from '../../types'
 import { getBackgrounds } from '../../api/client'
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'https://localhost:7001'
-
 function assetUrl(path: string | null): string | null {
   if (!path) return null
-  return `${API_BASE}/${path}`
+  return `/${path}`
 }
 
 interface Props {

@@ -51,6 +51,28 @@ export const DEFAULT_CANVAS_LAYOUT: CanvasLayout = {
   text: { ...DEFAULT_LAYER },
 }
 
+// ── Compose API types ─────────────────────────────────────────────────────────
+
+export interface ComposePreviewRequest {
+  backgroundLayoutId: string
+  subjectAssetId?: string
+  textConfigJson: string
+  /** Serialised CanvasLayout — per-layer x/y/scale/rotation adjustments */
+  canvasLayoutJson: string
+}
+
+export interface ComposePreviewResponse {
+  previewRelativePath: string
+  widthPx: number
+  heightPx: number
+}
+
+export interface ComposeExportResponse {
+  exportRelativePath: string
+  widthPx: number
+  heightPx: number
+}
+
 export interface WizardState {
   step: number
   productType: ProductType | null
