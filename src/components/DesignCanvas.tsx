@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { TextConfig, CanvasLayout, LayerTransform } from '../types'
 
 type LayerKey = keyof CanvasLayout
-const LAYER_KEYS: LayerKey[] = ['background', 'subject', 'text']
+const LAYER_KEYS: LayerKey[] = ['background', 'subject', 'title', 'subtitle', 'footer']
 
 interface Props {
   backgroundUrl: string | null
@@ -41,7 +41,11 @@ export default function DesignCanvas({
     return () => ro.disconnect()
   }, [])
 
-  const dragRef = useRef({ active: false, startX: 0, startY: 0, startTx: 0, startTy: 0 })
+  const dragRef = useRef({
+    active: false,
+    layerKey: 'subject' as LayerKey,
+    startX: 0, startY: 0, startTx: 0, startTy: 0,
+  })
   const interactive = !!onLayoutChange
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -78,21 +82,31 @@ export default function DesignCanvas({
     return () => el.removeEventListener('wheel', handler)
   }, [onLayoutChange])
 
-  // ─── Drag handlers ───────────────────────────────────────────────────────────
+  // ─── Drag helpers ─────────────────────────────────────────────────────────
 
+  /** Select a layer and begin dragging it. Call from each element's onMouseDown. */
+  const startLayerDrag = (key: LayerKey, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!interactive) return
+    setActiveLayer(key)
+    activeLayerRef.current = key
+    const cur = layoutRef.current[key]
+    dragRef.current = { active: true, layerKey: key, startX: e.clientX, startY: e.clientY, startTx: cur.x, startTy: cur.y }
+    if (containerRef.current) containerRef.current.style.cursor = 'grabbing'
+  }
+
+  /** Canvas background click/drag — selects + drags background layer. */
   const onCanvasMouseDown = (e: React.MouseEvent) => {
     if (!interactive) return
     e.preventDefault()
-    const cur = layoutRef.current[activeLayerRef.current]
-    dragRef.current = { active: true, startX: e.clientX, startY: e.clientY, startTx: cur.x, startTy: cur.y }
-    if (containerRef.current) containerRef.current.style.cursor = 'grabbing'
+    startLayerDrag('background', e)
   }
 
   const onMouseMove = (e: React.MouseEvent) => {
     const d = dragRef.current
     if (!d.active || !containerRef.current) return
     const rect = containerRef.current.getBoundingClientRect()
-    patchLayer(activeLayerRef.current, {
+    patchLayer(d.layerKey, {
       x: Math.max(-2, Math.min(2, d.startTx + (e.clientX - d.startX) / rect.width)),
       y: Math.max(-2, Math.min(2, d.startTy + (e.clientY - d.startY) / rect.height)),
     })
@@ -103,7 +117,7 @@ export default function DesignCanvas({
     if (containerRef.current) containerRef.current.style.cursor = interactive ? 'grab' : ''
   }
 
-  // ─── Layer transform CSS ──────────────────────────────────────────────────────
+  // ─── Layer transform CSS ──────────────────────────────────────────────────
 
   const { w: cw, h: ch } = canvasSize
 
@@ -113,18 +127,18 @@ export default function DesignCanvas({
   const subjectTransform = (l: LayerTransform) =>
     `translate(calc(-50% + ${l.x * cw}px), calc(-50% + ${l.y * ch}px)) scale(${l.scale}) rotate(${l.rotation}deg)`
 
-  const textTransform = (l: LayerTransform) =>
-    `translate(${l.x * cw}px, ${l.y * ch}px) scale(${l.scale}) rotate(${l.rotation}deg)`
+  const textLayerTransform = (l: LayerTransform) =>
+    `translate(-50%, -50%) translate(${l.x * cw}px, ${l.y * ch}px) scale(${l.scale}) rotate(${l.rotation}deg)`
 
   const activeOutline = (key: LayerKey): React.CSSProperties =>
     interactive && activeLayer === key
-      ? { outline: '2px solid rgb(99,102,241)', outlineOffset: '2px', zIndex: 10 }
+      ? { outline: '2px dashed rgb(99,102,241)', outlineOffset: '3px', zIndex: 10 }
       : {}
 
-  const { background: bg, subject, text } = layout
+  const { background: bg, subject } = layout
   const sel = layout[activeLayer]
 
-  // ─── Render ───────────────────────────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="flex gap-3">
@@ -143,7 +157,6 @@ export default function DesignCanvas({
           <div
             className="absolute inset-0"
             style={activeOutline('background')}
-            onClick={() => interactive && setActiveLayer('background')}
           >
             {backgroundUrl ? (
               <img
@@ -173,7 +186,7 @@ export default function DesignCanvas({
                 transformOrigin: 'center center',
                 ...activeOutline('subject'),
               }}
-              onClick={(e) => { e.stopPropagation(); interactive && setActiveLayer('subject') }}
+              onMouseDown={(e) => startLayerDrag('subject', e)}
             >
               <img
                 src={subjectUrl}
@@ -184,28 +197,90 @@ export default function DesignCanvas({
             </div>
           )}
 
-          {/* Layer 3: Text */}
-          <div
-            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-6 py-6 pointer-events-auto"
-            style={{
-              transform: textTransform(text),
-              transformOrigin: 'center center',
-              ...activeOutline('text'),
-            }}
-            onClick={(e) => { e.stopPropagation(); interactive && setActiveLayer('text') }}
-          >
-            {textConfig.title ? (
-              <p className="text-white font-bold text-lg leading-tight text-center drop-shadow">{textConfig.title}</p>
-            ) : (
-              <p className="text-white/30 font-bold text-lg leading-tight text-center italic">{t('step6.titlePlaceholder')}</p>
-            )}
-            {textConfig.subtitle && (
-              <p className="text-white/80 text-sm text-center mt-1">{textConfig.subtitle}</p>
-            )}
-            {textConfig.footer && (
-              <p className="text-white/60 text-xs text-center mt-2 border-t border-white/20 pt-2">{textConfig.footer}</p>
-            )}
-          </div>
+          {/* Layer 3a: Title — independent draggable text element */}
+          {(textConfig.title || interactive) && (
+            <div
+              className="absolute pointer-events-auto"
+              style={{
+                left: '50%',
+                top: '73%',
+                transform: textLayerTransform(layout.title),
+                transformOrigin: 'center center',
+                cursor: interactive ? 'move' : 'default',
+                ...activeOutline('title'),
+              }}
+              onMouseDown={(e) => startLayerDrag('title', e)}
+            >
+              {textConfig.title ? (
+                <p className="text-white font-bold text-lg leading-tight text-center whitespace-nowrap"
+                   style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
+                  {textConfig.title}
+                </p>
+              ) : (
+                <p className="text-white/30 font-bold text-lg leading-tight text-center italic whitespace-nowrap"
+                   style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                  {t('step6.titlePlaceholder')}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Layer 3b: Subtitle — independent draggable text element */}
+          {(textConfig.subtitle || interactive) && (
+            <div
+              className="absolute pointer-events-auto"
+              style={{
+                left: '50%',
+                top: '82%',
+                transform: textLayerTransform(layout.subtitle),
+                transformOrigin: 'center center',
+                cursor: interactive ? 'move' : 'default',
+                ...activeOutline('subtitle'),
+              }}
+              onMouseDown={(e) => startLayerDrag('subtitle', e)}
+            >
+              {textConfig.subtitle ? (
+                <p className="text-white/90 text-sm text-center whitespace-nowrap"
+                   style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
+                  {textConfig.subtitle}
+                </p>
+              ) : (
+                <p className="text-white/20 text-sm text-center italic whitespace-nowrap"
+                   style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                  {t('step6.subtitlePlaceholder')}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Layer 3c: Footer — independent draggable text element */}
+          {(textConfig.footer || interactive) && (
+            <div
+              className="absolute pointer-events-auto"
+              style={{
+                left: '50%',
+                top: '91%',
+                maxWidth: '80%',
+                transform: textLayerTransform(layout.footer),
+                transformOrigin: 'center center',
+                cursor: interactive ? 'move' : 'default',
+                ...activeOutline('footer'),
+              }}
+              onMouseDown={(e) => startLayerDrag('footer', e)}
+            >
+              {textConfig.footer ? (
+                <p className="text-white/70 text-xs text-center"
+                   style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
+                  {textConfig.footer}
+                </p>
+              ) : (
+                <p className="text-white/20 text-xs text-center italic"
+                   style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                  {t('step6.footerPlaceholder')}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Watermark */}
           {watermark && (

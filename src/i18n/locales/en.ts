@@ -4,7 +4,9 @@ const en = {
     layer: {
       background: 'Background',
       subject: 'Subject',
-      text: 'Text',
+      title: 'Title',
+      subtitle: 'Subtitle',
+      footer: 'Footer',
     },
     scale: 'Scale',
     rotation: 'Rotation',
@@ -132,6 +134,8 @@ const en = {
     },
     previewLabel: 'Text Preview',
     titlePlaceholder: 'Main title…',
+    subtitlePlaceholder: 'Subtitle…',
+    footerPlaceholder: 'Footer…',
   },
 
   step7: {

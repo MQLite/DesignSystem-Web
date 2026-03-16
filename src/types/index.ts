@@ -40,7 +40,10 @@ export interface LayerTransform {
 export interface CanvasLayout {
   background: LayerTransform
   subject: LayerTransform
-  text: LayerTransform
+  /** Each text segment is an independent draggable/scalable layer */
+  title: LayerTransform
+  subtitle: LayerTransform
+  footer: LayerTransform
 }
 
 export const DEFAULT_LAYER: LayerTransform = { x: 0, y: 0, scale: 1.0, rotation: 0 }
@@ -48,7 +51,9 @@ export const DEFAULT_LAYER: LayerTransform = { x: 0, y: 0, scale: 1.0, rotation:
 export const DEFAULT_CANVAS_LAYOUT: CanvasLayout = {
   background: { ...DEFAULT_LAYER },
   subject: { ...DEFAULT_LAYER },
-  text: { ...DEFAULT_LAYER },
+  title: { ...DEFAULT_LAYER },
+  subtitle: { ...DEFAULT_LAYER },
+  footer: { ...DEFAULT_LAYER },
 }
 
 // ── Compose API types ─────────────────────────────────────────────────────────

@@ -4,7 +4,9 @@ const zhCN = {
     layer: {
       background: '背景',
       subject: '人物',
-      text: '文字',
+      title: '主标题',
+      subtitle: '副标题',
+      footer: '页脚',
     },
     scale: '缩放',
     rotation: '旋转',
@@ -132,6 +134,8 @@ const zhCN = {
     },
     previewLabel: '文字预览',
     titlePlaceholder: '主标题…',
+    subtitlePlaceholder: '副标题…',
+    footerPlaceholder: '页脚文字…',
   },
 
   step7: {

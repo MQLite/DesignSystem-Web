@@ -137,7 +137,9 @@ export async function exportSvg(opts: SvgExportOptions): Promise<SvgExportResult
 
   const bg = opts.canvasLayout?.background ?? { x: 0, y: 0, scale: 1, rotation: 0 }
   const subj = opts.canvasLayout?.subject ?? { x: 0, y: 0, scale: 1, rotation: 0 }
-  const txt = opts.canvasLayout?.text ?? { x: 0, y: 0, scale: 1, rotation: 0 }
+  const titleL = opts.canvasLayout?.title ?? { x: 0, y: 0, scale: 1, rotation: 0 }
+  const subtitleL = opts.canvasLayout?.subtitle ?? { x: 0, y: 0, scale: 1, rotation: 0 }
+  const footerL = opts.canvasLayout?.footer ?? { x: 0, y: 0, scale: 1, rotation: 0 }
 
   // Load images in parallel
   const [bgData, subjectData] = await Promise.all([
@@ -162,19 +164,22 @@ export async function exportSvg(opts: SvgExportOptions): Promise<SvgExportResult
     ? `translate(${subCx} ${subCy}) rotate(${subj.rotation}) translate(${-subCx} ${-subCy})`
     : ''
 
-  // Text block — bottom of canvas, with optional transform
-  const textBaseY = H - Math.round(H * 0.22)   // approx center of text block
-  const txtTx = Math.round(txt.x * W)
-  const txtTy = Math.round(txt.y * H)
-  const textGroupTransform = svgLayerTransform(txt, txtTx, txtTy, W / 2, textBaseY)
+  // Per-segment text transforms (default tops: 73%, 82%, 91% of canvas height)
+  const titleBaseY = Math.round(H * 0.73)
+  const subtitleBaseY = Math.round(H * 0.82)
+  const footerBaseY = Math.round(H * 0.91)
 
-  const textLines: TextLine[] = [
-    { content: title,    y: H - Math.round(H * 0.13), fontSize: Math.round(W * 0.058), fill: 'white', fontWeight: 'bold' },
-    { content: subtitle, y: H - Math.round(H * 0.08), fontSize: Math.round(W * 0.032), fill: 'rgba(255,255,255,0.85)' },
-    { content: footer,   y: H - Math.round(H * 0.04), fontSize: Math.round(W * 0.022), fill: 'rgba(255,255,255,0.65)' },
-  ]
+  const titleTransform = svgLayerTransform(titleL, Math.round(titleL.x * W), Math.round(titleL.y * H), W / 2, titleBaseY)
+  const subtitleTransform = svgLayerTransform(subtitleL, Math.round(subtitleL.x * W), Math.round(subtitleL.y * H), W / 2, subtitleBaseY)
+  const footerTransform = svgLayerTransform(footerL, Math.round(footerL.x * W), Math.round(footerL.y * H), W / 2, footerBaseY)
 
-  const { svg: textSvg, curved } = buildTextLayer(textLines, W, font)
+  const titleLines: TextLine[] = [{ content: title, y: titleBaseY, fontSize: Math.round(W * 0.058), fill: 'white', fontWeight: 'bold' }]
+  const subtitleLines: TextLine[] = [{ content: subtitle, y: subtitleBaseY, fontSize: Math.round(W * 0.032), fill: 'rgba(255,255,255,0.85)' }]
+  const footerLines: TextLine[] = [{ content: footer, y: footerBaseY, fontSize: Math.round(W * 0.022), fill: 'rgba(255,255,255,0.65)' }]
+
+  const { svg: titleSvg, curved } = buildTextLayer(titleLines, W, font)
+  const { svg: subtitleSvg } = buildTextLayer(subtitleLines, W, font)
+  const { svg: footerSvg } = buildTextLayer(footerLines, W, font)
 
   const gradId = 'g1'
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
@@ -209,9 +214,19 @@ ${subjectData
   : '    <!-- No subject photo uploaded -->'}
   </g>
 
-  <!-- Layer 4: Text${curved ? ' (converted to paths / 曲线化)' : ' (text elements)'} -->
-  <g id="layer-text" transform="${textGroupTransform}">
-    ${textSvg}
+  <!-- Layer 4: Title${curved ? ' (converted to paths / 曲线化)' : ' (text elements)'} -->
+  <g id="layer-title" transform="${titleTransform}">
+    ${titleSvg}
+  </g>
+
+  <!-- Layer 5: Subtitle -->
+  <g id="layer-subtitle" transform="${subtitleTransform}">
+    ${subtitleSvg}
+  </g>
+
+  <!-- Layer 6: Footer -->
+  <g id="layer-footer" transform="${footerTransform}">
+    ${footerSvg}
   </g>
 
 </svg>`
