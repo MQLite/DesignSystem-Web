@@ -7,8 +7,47 @@ export interface BackgroundLayout {
   sizeCode: string
   orientation: string
   subjectSlotsJson: string
-  textZonesJson: string
+  /** Crop frame definition(s) for the subject image. Null when the template has no crop frame. */
+  subjectCropFramesJson: string | null
+  textZonesJson: string | null
   version: number
+}
+
+// ── Subject crop types ────────────────────────────────────────────────────────
+
+/**
+ * Defines a single crop window on the canvas (from BackgroundLayout.subjectCropFramesJson).
+ * All coordinates are normalised 0..1 (fraction of canvas width/height).
+ * Parse from subjectCropFramesJson as SubjectCropFrame[].
+ */
+export interface SubjectCropFrame {
+  /** Stable id referenced by SubjectCropState entries. */
+  id: string
+  /** Crop window position on canvas (normalised 0..1). */
+  x: number
+  y: number
+  w: number
+  h: number
+  /** "rect" | "circle" | "oval" */
+  shape: string
+  /** Optional locked aspect ratio (width / height). Null = free. */
+  aspectRatio: number | null
+  allowUserMove: boolean
+  allowUserScale: boolean
+}
+
+/**
+ * One entry in DesignProject.SubjectCropStateJson — records how the user has
+ * panned / zoomed the subject photo within a specific crop frame.
+ * offsetX / offsetY are normalised (fraction of crop frame size).
+ * scale is a multiplier applied on top of the fitted size.
+ * TODO: persist in WizardState and send to compose API once the crop UI is built.
+ */
+export interface SubjectCropState {
+  cropFrameId: string
+  offsetX: number
+  offsetY: number
+  scale: number
 }
 
 export interface BackgroundDto {
