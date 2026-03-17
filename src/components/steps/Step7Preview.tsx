@@ -51,7 +51,7 @@ export default function Step7Preview({ state }: Props) {
   const [svgExporting, setSvgExporting] = useState(false)
 
   const { productType, sizeCode, occasionType, selectedBackground, selectedLayoutId,
-    subjectAssetId, textConfig, subjectPreviewUrl, canvasLayout } = state
+    subjectAssetId, textConfig, subjectPreviewUrl, canvasLayout, subjectCropStates } = state
 
   const showToast = (msg: string) => {
     setToastMsg(msg)
@@ -65,6 +65,9 @@ export default function Step7Preview({ state }: Props) {
         subjectAssetId: subjectAssetId ?? undefined,
         textConfigJson: JSON.stringify(textConfig),
         canvasLayoutJson: JSON.stringify(canvasLayout),
+        subjectCropStateJson: subjectCropStates.length > 0
+          ? JSON.stringify(subjectCropStates)
+          : undefined,
       }
     : null
 

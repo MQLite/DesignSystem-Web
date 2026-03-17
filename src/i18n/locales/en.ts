@@ -122,6 +122,9 @@ const en = {
     brightness: 'Brightness',
     contrast: 'Contrast',
     saturation: 'Saturation',
+    cropTitle: 'Crop & Position',
+    cropDescription: 'Drag to pan · Scroll or use ± buttons to zoom · The framed area will be placed on the design',
+    cropHint: 'Drag or scroll to adjust',
   },
 
   step6: {

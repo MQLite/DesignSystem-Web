@@ -103,6 +103,8 @@ export interface ComposePreviewRequest {
   textConfigJson: string
   /** Serialised CanvasLayout — per-layer x/y/scale/rotation adjustments */
   canvasLayoutJson: string
+  /** Serialised SubjectCropState[] — user's pan/zoom within each crop frame. Omit when empty. */
+  subjectCropStateJson?: string
 }
 
 export interface ComposePreviewResponse {
@@ -129,4 +131,6 @@ export interface WizardState {
   subjectPreviewUrl: string | null
   textConfig: TextConfig
   canvasLayout: CanvasLayout
+  /** User's crop pan/zoom adjustments, one entry per crop frame id. Empty when not yet adjusted. */
+  subjectCropStates: SubjectCropState[]
 }

@@ -122,6 +122,9 @@ const zhCN = {
     brightness: '亮度',
     contrast: '对比度',
     saturation: '饱和度',
+    cropTitle: '裁剪 & 定位',
+    cropDescription: '拖动平移 · 滚轮或 ± 按钮缩放 · 框内区域将用于最终合成',
+    cropHint: '拖动或滚轮调整',
   },
 
   step6: {

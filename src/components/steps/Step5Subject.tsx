@@ -1,11 +1,26 @@
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { WizardState } from '../../types'
+import type { WizardState, SubjectCropFrame, SubjectCropState } from '../../types'
 import { uploadSubject } from '../../api/client'
+import CropEditor from '../CropEditor'
 
 interface Props {
   state: WizardState
   update: (patch: Partial<WizardState>) => void
+}
+
+/** Parse SubjectCropFrame[] from a layout's subjectCropFramesJson, or return []. */
+function parseCropFrames(json: string | null | undefined): SubjectCropFrame[] {
+  if (!json) return []
+  try { return JSON.parse(json) } catch { return [] }
+}
+
+/** Return the existing CropState for a frame, or a default-initialised one. */
+function getCropState(states: SubjectCropState[], cropFrameId: string): SubjectCropState {
+  return (
+    states.find((s) => s.cropFrameId === cropFrameId) ??
+    { cropFrameId, offsetX: 0, offsetY: 0, scale: 1.0 }
+  )
 }
 
 export default function Step5Subject({ state, update }: Props) {
@@ -14,6 +29,14 @@ export default function Step5Subject({ state, update }: Props) {
   const [dragging, setDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Derive crop frames from the currently selected layout
+  const selectedLayout = state.selectedBackground?.layout.find(
+    (l) => l.id === state.selectedLayoutId,
+  )
+  const cropFrames = parseCropFrames(selectedLayout?.subjectCropFramesJson)
+  // For PoC: use the first crop frame only
+  const primaryCropFrame: SubjectCropFrame | null = cropFrames[0] ?? null
 
   const handleFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -25,7 +48,12 @@ export default function Step5Subject({ state, update }: Props) {
     const localUrl = URL.createObjectURL(file)
     try {
       const res = await uploadSubject(file)
-      update({ subjectAssetId: res.subjectAssetId, subjectPreviewUrl: localUrl })
+      // Reset crop state when a new photo is uploaded
+      update({
+        subjectAssetId: res.subjectAssetId,
+        subjectPreviewUrl: localUrl,
+        subjectCropStates: [],
+      })
     } catch (e) {
       setError((e as Error).message)
       URL.revokeObjectURL(localUrl)
@@ -47,9 +75,15 @@ export default function Step5Subject({ state, update }: Props) {
   }
 
   const reset = () => {
-    update({ subjectAssetId: null, subjectPreviewUrl: null })
+    update({ subjectAssetId: null, subjectPreviewUrl: null, subjectCropStates: [] })
     setError(null)
     if (inputRef.current) inputRef.current.value = ''
+  }
+
+  /** Update a single crop frame's state, leaving other frames untouched. */
+  const handleCropChange = (next: SubjectCropState) => {
+    const others = state.subjectCropStates.filter((s) => s.cropFrameId !== next.cropFrameId)
+    update({ subjectCropStates: [...others, next] })
   }
 
   return (
@@ -57,40 +91,69 @@ export default function Step5Subject({ state, update }: Props) {
       <p className="text-gray-500 text-sm mb-6">{t('step5.hint')}</p>
 
       {state.subjectPreviewUrl ? (
-        /* Preview after upload */
-        <div className="rounded-xl border-2 border-indigo-200 bg-indigo-50 p-6 flex items-start gap-5">
-          <img
-            src={state.subjectPreviewUrl}
-            alt="主体预览"
-            className="w-32 h-32 object-cover rounded-lg border border-indigo-200 flex-shrink-0"
-          />
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                <svg viewBox="0 0 20 20" fill="white" className="w-3 h-3">
-                  <path
-                    fillRule="evenodd"
-                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </span>
-              <span className="font-medium text-gray-900">{t('step5.uploadSuccess')}</span>
+        /* ── Uploaded state ── */
+        <div className="space-y-4">
+          {/* Success header */}
+          <div className="rounded-xl border-2 border-indigo-200 bg-indigo-50 p-6 flex items-start gap-5">
+            <img
+              src={state.subjectPreviewUrl}
+              alt="主体预览"
+              className="w-24 h-24 object-cover rounded-lg border border-indigo-200 flex-shrink-0"
+            />
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <svg viewBox="0 0 20 20" fill="white" className="w-3 h-3">
+                    <path
+                      fillRule="evenodd"
+                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </span>
+                <span className="font-medium text-gray-900">{t('step5.uploadSuccess')}</span>
+              </div>
+              <p className="text-xs text-gray-400 font-mono mb-3">ID: {state.subjectAssetId}</p>
+              <button
+                onClick={reset}
+                className="text-sm text-gray-500 underline hover:text-gray-700"
+              >
+                {t('step5.reupload')}
+              </button>
             </div>
-            <p className="text-xs text-gray-400 font-mono mb-3">ID: {state.subjectAssetId}</p>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 mb-4">
-              {t('step5.pocNote')}
+          </div>
+
+          {/* Crop editor — shown when the selected template defines crop frames */}
+          {primaryCropFrame && (
+            <div className="rounded-xl border border-indigo-200 bg-white p-5">
+              <h3 className="font-medium text-gray-800 mb-1 text-sm">{t('step5.cropTitle')}</h3>
+              <p className="text-xs text-gray-400 mb-4">{t('step5.cropDescription')}</p>
+              <CropEditor
+                imageUrl={state.subjectPreviewUrl}
+                cropFrame={primaryCropFrame}
+                value={getCropState(state.subjectCropStates, primaryCropFrame.id)}
+                onChange={handleCropChange}
+              />
             </div>
-            <button
-              onClick={reset}
-              className="text-sm text-gray-500 underline hover:text-gray-700"
-            >
-              {t('step5.reupload')}
-            </button>
+          )}
+
+          {/* Colour adjustments — PoC placeholder */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <h3 className="font-medium text-gray-800 mb-3 text-sm">{t('step5.adjustments')}</h3>
+            <div className="space-y-4 opacity-50 pointer-events-none">
+              {[t('step5.brightness'), t('step5.contrast'), t('step5.saturation')].map((label) => (
+                <div key={label} className="flex items-center gap-4">
+                  <span className="text-sm text-gray-600 w-16">{label}</span>
+                  <input type="range" min={-100} max={100} defaultValue={0} className="flex-1" />
+                  <span className="text-xs text-gray-400 w-8 text-right">0</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-3">{t('step5.adjustmentNote')}</p>
           </div>
         </div>
       ) : (
-        /* Drop zone */
+        /* ── Drop zone ── */
         <div
           onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
@@ -145,23 +208,6 @@ export default function Step5Subject({ state, update }: Props) {
         className="hidden"
         onChange={onInputChange}
       />
-
-      {/* Adjustment controls placeholder */}
-      {state.subjectPreviewUrl && (
-        <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
-          <h3 className="font-medium text-gray-800 mb-4 text-sm">{t('step5.adjustments')}</h3>
-          <div className="space-y-4 opacity-50 pointer-events-none">
-            {[t('step5.brightness'), t('step5.contrast'), t('step5.saturation')].map((label) => (
-              <div key={label} className="flex items-center gap-4">
-                <span className="text-sm text-gray-600 w-16">{label}</span>
-                <input type="range" min={-100} max={100} defaultValue={0} className="flex-1" />
-                <span className="text-xs text-gray-400 w-8 text-right">0</span>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-gray-400 mt-3">{t('step5.adjustmentNote')}</p>
-        </div>
-      )}
     </div>
   )
 }

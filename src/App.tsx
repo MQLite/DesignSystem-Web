@@ -23,6 +23,7 @@ const INITIAL: WizardState = {
   subjectPreviewUrl: null,
   textConfig: { title: '', subtitle: '', footer: '' },
   canvasLayout: DEFAULT_CANVAS_LAYOUT,
+  subjectCropStates: [],
 }
 
 export default function App() {
