@@ -119,6 +119,43 @@ export interface ComposeExportResponse {
   heightPx: number
 }
 
+// ── Project API types ─────────────────────────────────────────────────────────
+
+export interface ProjectDetail {
+  id: string
+  backgroundLayoutId: string
+  subjectAssetId: string | null
+  productType: string
+  occasionType: string
+  textConfig: { title: string; subtitle: string; footer: string }
+  canvasLayout: CanvasLayout | null
+  subjectCropStates: SubjectCropState[] | null
+  status: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateProjectRequest {
+  backgroundLayoutId: string
+  subjectAssetId?: string
+  productType: string
+  occasionType: string
+}
+
+export interface UpdateProjectTextRequest {
+  title: string
+  subtitle: string
+  footer: string
+}
+
+export interface UpdateProjectCropRequest {
+  cropStates: SubjectCropState[]
+}
+
+export interface UpdateProjectAdjustmentsRequest {
+  layout: CanvasLayout
+}
+
 export interface WizardState {
   step: number
   productType: ProductType | null
