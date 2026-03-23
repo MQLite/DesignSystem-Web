@@ -5,46 +5,45 @@ export type OccasionType = 'Funeral' | 'Birthday' | 'Others'
 export interface BackgroundLayout {
   id: string
   sizeCode: string
+  widthMm: number
+  heightMm: number
   orientation: string
   subjectSlotsJson: string
-  /** Crop frame definition(s) for the subject image. Null when the template has no crop frame. */
-  subjectCropFramesJson: string | null
   textZonesJson: string | null
   version: number
 }
 
-// ── Subject crop types ────────────────────────────────────────────────────────
+// ── Subject slot + crop types ─────────────────────────────────────────────────
 
 /**
- * Defines a single crop window on the canvas (from BackgroundLayout.subjectCropFramesJson).
+ * One slot parsed from BackgroundLayout.subjectSlotsJson.
+ * Defines where and how the subject image is placed on the final canvas.
  * All coordinates are normalised 0..1 (fraction of canvas width/height).
- * Parse from subjectCropFramesJson as SubjectCropFrame[].
+ * The slot rect also serves as the crop viewport — aspect ratio = w / h.
  */
-export interface SubjectCropFrame {
-  /** Stable id referenced by SubjectCropState entries. */
+export interface SubjectSlot {
   id: string
-  /** Crop window position on canvas (normalised 0..1). */
   x: number
   y: number
   w: number
   h: number
-  /** "rect" | "circle" | "oval" */
-  shape: string
-  /** Optional locked aspect ratio (width / height). Null = free. */
-  aspectRatio: number | null
+  anchor?: string
+  fitMode?: string
   allowUserMove: boolean
   allowUserScale: boolean
+  minScale?: number
+  maxScale?: number
 }
 
 /**
  * One entry in DesignProject.SubjectCropStateJson — records how the user has
- * panned / zoomed the subject photo within a specific crop frame.
- * offsetX / offsetY are normalised (fraction of crop frame size).
- * scale is a multiplier applied on top of the fitted size.
- * TODO: persist in WizardState and send to compose API once the crop UI is built.
+ * panned / zoomed the subject photo within a specific slot's crop viewport.
+ * slotId references SubjectSlot.id.
+ * offsetX / offsetY are normalised (fraction of slot size, 0 = centred).
+ * scale is a multiplier applied on top of the "cover" fitted size.
  */
 export interface SubjectCropState {
-  cropFrameId: string
+  slotId: string
   offsetX: number
   offsetY: number
   scale: number
@@ -59,10 +58,19 @@ export interface BackgroundDto {
   layout: BackgroundLayout[]
 }
 
-export interface TextConfig {
-  title: string
-  subtitle: string
-  footer: string
+/** Text content keyed by zone id (dynamic — matches the template's textZonesJson). */
+export type TextConfig = Record<string, string>
+
+/**
+ * One text zone parsed from BackgroundLayout.textZonesJson.
+ * Coordinates are normalised 0..1 (fraction of canvas width/height).
+ */
+export interface TextZone {
+  id: string
+  x: number
+  y: number
+  w: number
+  h: number
 }
 
 export interface LayerTransform {

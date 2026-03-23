@@ -21,7 +21,7 @@ const INITIAL: WizardState = {
   customBackgroundUrl: null,
   subjectAssetId: null,
   subjectPreviewUrl: null,
-  textConfig: { title: '', subtitle: '', footer: '' },
+  textConfig: {},
   canvasLayout: DEFAULT_CANVAS_LAYOUT,
   subjectCropStates: [],
 }
@@ -53,7 +53,16 @@ export default function App() {
       case 3: return state.occasionType !== null
       case 4: return state.selectedBackground !== null || state.customBackgroundUrl !== null
       case 5: return state.subjectAssetId !== null
-      case 6: return state.textConfig.title.trim().length > 0
+      case 6: {
+        const layout = state.selectedBackground?.layout.find(
+          (l) => l.id === state.selectedLayoutId,
+        )
+        const hasZones =
+          !!layout?.textZonesJson &&
+          (() => { try { return (JSON.parse(layout.textZonesJson) as unknown[]).length > 0 } catch { return false } })()
+        if (!hasZones) return true
+        return Object.values(state.textConfig).some((v) => v.trim().length > 0)
+      }
       default: return false
     }
   }

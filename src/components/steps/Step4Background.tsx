@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { WizardState, BackgroundDto } from '../../types'
+import type { WizardState, BackgroundDto, SubjectSlot } from '../../types'
 import { getBackgrounds } from '../../api/client'
+
+function parseSlots(json: string | null | undefined): SubjectSlot[] {
+  if (!json) return []
+  try { return JSON.parse(json) as SubjectSlot[] } catch { return [] }
+}
 
 function assetUrl(path: string | null): string | null {
   if (!path) return null
@@ -28,6 +33,12 @@ function BackgroundCard({
   const layout = bg.layout.find((l) => l.sizeCode === sizeCode) ?? bg.layout[0]
   const [imgErr, setImgErr] = useState(false)
 
+  const slots = parseSlots(layout?.subjectSlotsJson)
+  const previewAspect =
+    layout && layout.widthMm > 0 && layout.heightMm > 0
+      ? layout.widthMm / layout.heightMm
+      : 3 / 4
+
   return (
     <button
       onClick={onClick}
@@ -36,7 +47,10 @@ function BackgroundCard({
       }`}
     >
       {/* Preview image */}
-      <div className="relative bg-gray-100 aspect-[3/4] w-full overflow-hidden">
+      <div
+        className="relative bg-gray-100 w-full overflow-hidden"
+        style={{ aspectRatio: String(previewAspect) }}
+      >
         {bg.previewPath && !imgErr ? (
           <img
             src={assetUrl(bg.previewPath)!}
@@ -57,6 +71,23 @@ function BackgroundCard({
             <span className="text-xs">{t('step4.noPreview')}</span>
           </div>
         )}
+
+        {/* Slot overlays — dashed crop frame hints */}
+        {slots.map((slot) => (
+          <div
+            key={slot.id}
+            className="absolute pointer-events-none"
+            style={{
+              left: `${slot.x * 100}%`,
+              top: `${slot.y * 100}%`,
+              width: `${slot.w * 100}%`,
+              height: `${slot.h * 100}%`,
+              border: '2px dashed rgba(255,255,255,0.85)',
+              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.35)',
+            }}
+          />
+        ))}
+
         {selected && (
           <div className="absolute top-2 right-2 w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center">
             <svg viewBox="0 0 20 20" fill="white" className="w-4 h-4">

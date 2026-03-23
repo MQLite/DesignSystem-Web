@@ -53,6 +53,9 @@ export default function Step7Preview({ state }: Props) {
   const { productType, sizeCode, occasionType, selectedBackground, selectedLayoutId,
     subjectAssetId, textConfig, subjectPreviewUrl, canvasLayout, subjectCropStates } = state
 
+  const selectedLayout = selectedBackground?.layout.find((l) => l.id === selectedLayoutId)
+  const layoutAspectRatio = selectedLayout ? selectedLayout.widthMm / selectedLayout.heightMm : 3 / 4
+
   const showToast = (msg: string) => {
     setToastMsg(msg)
     setTimeout(() => setToastMsg(null), 4000)
@@ -73,14 +76,20 @@ export default function Step7Preview({ state }: Props) {
 
   // Fetch backend preview on mount
   useEffect(() => {
-    if (!composeReq) return
+    if (!composeReq) {
+      console.warn('[Step7] composeReq is null — selectedLayoutId missing?', { selectedLayoutId })
+      return
+    }
+    console.log('[Step7] Sending compose request:', composeReq)
     setPreviewStatus('loading')
     composePreview(composeReq)
       .then((res) => {
+        console.log('[Step7] Compose response:', res)
         setPreviewUrl(`/${res.previewRelativePath}`)
         setPreviewStatus('done')
       })
       .catch((e: Error) => {
+        console.error('[Step7] Compose error:', e)
         setPreviewStatus('error')
         showToast(e.message)
       })
@@ -114,7 +123,7 @@ export default function Step7Preview({ state }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Left: Backend-rendered preview */}
         <div className="lg:col-span-3">
-          <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-100 aspect-[3/4] flex items-center justify-center">
+          <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center" style={{ aspectRatio: String(layoutAspectRatio) }}>
             {previewStatus === 'loading' && (
               <div className="flex flex-col items-center gap-3 text-gray-400">
                 <svg className="animate-spin w-8 h-8" fill="none" viewBox="0 0 24 24">
@@ -130,6 +139,8 @@ export default function Step7Preview({ state }: Props) {
                 src={previewUrl}
                 alt={t('step7.previewAlt')}
                 className="w-full h-full object-contain"
+                onLoad={() => console.log('[Step7] Preview image loaded:', previewUrl)}
+                onError={() => console.error('[Step7] Preview image failed to load:', previewUrl)}
               />
             )}
 
@@ -158,7 +169,7 @@ export default function Step7Preview({ state }: Props) {
             <SummaryRow label={t('step7.configOccasion')} value={occasionType ? t(`step7.occasions.${occasionType}`) : '—'} />
             <SummaryRow label={t('step7.configBackground')} value={selectedBackground?.name ?? '—'} />
             <SummaryRow label={t('step7.configSubject')} value={subjectPreviewUrl ? t('step7.subjectUploaded') : t('step7.subjectNone')} />
-            <SummaryRow label={t('step7.configMainTitle')} value={textConfig.title || '—'} />
+            <SummaryRow label={t('step7.configMainTitle')} value={textConfig['title'] || '—'} />
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-5">

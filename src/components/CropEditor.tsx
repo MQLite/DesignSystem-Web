@@ -1,43 +1,75 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { SubjectCropFrame, SubjectCropState } from '../types'
+import type { SubjectSlot, SubjectCropState } from '../types'
 
 interface Props {
+  /** URL of the selected background image (shown as canvas context). */
+  backgroundImageUrl: string | null
+  /** widthMm / heightMm of the layout — sets the outer canvas aspect ratio. */
+  backgroundAspectRatio: number
+  /** URL of the uploaded subject photo. */
   imageUrl: string
-  cropFrame: SubjectCropFrame
+  slot: SubjectSlot
   value: SubjectCropState
   onChange: (s: SubjectCropState) => void
 }
 
 /**
- * Interactive crop/pan/zoom editor for the subject photo.
- * The viewport's aspect ratio is derived from cropFrame.aspectRatio (or w/h as fallback).
- * offsetX/offsetY are fractions of the viewport size (0 = centered).
- * scale is a multiplier over the natural "cover" fit.
+ * Crop/pan/zoom editor that shows the full background as context.
+ *
+ * Layout:
+ *   - Outer container: background aspect ratio, shows the background image.
+ *   - Slot div: positioned at slot.x/y/w/h (% of outer), overflow hidden → crop viewport.
+ *   - Subject image inside slot div: min-w/min-h cover, centred, with pan+zoom transform.
+ *
+ * Transform on subject img:
+ *   translate(-50%, -50%) translate(panX px, panY px) scale(scale)
+ *   panX/panY are in slot-div pixels (offsetX/Y × slotPx.w/h).
  */
-export default function CropEditor({ imageUrl, cropFrame, value, onChange }: Props) {
+export default function CropEditor({
+  backgroundImageUrl,
+  backgroundAspectRatio,
+  imageUrl,
+  slot,
+  value,
+  onChange,
+}: Props) {
   const { t } = useTranslation()
-  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Guard against NaN (e.g. widthMm/heightMm not yet in API response) — fall back to slot shape
+  const canvasAspectRatio =
+    isFinite(backgroundAspectRatio) && backgroundAspectRatio > 0
+      ? backgroundAspectRatio
+      : slot.w / slot.h
+
+  const slotRef = useRef<HTMLDivElement>(null)
+  const [slotPx, setSlotPx] = useState({ w: 0, h: 0 })
   const dragRef = useRef({ active: false, startX: 0, startY: 0, startOx: 0, startOy: 0 })
 
-  // Keep stable refs so the wheel handler never goes stale
-  const valueRef = useRef(value)
-  valueRef.current = value
-  const onChangeRef = useRef(onChange)
-  onChangeRef.current = onChange
-
-  const aspectRatio = cropFrame.aspectRatio ?? (cropFrame.w / cropFrame.h)
+  // Track slot pixel size for accurate pan computation
+  useEffect(() => {
+    const el = slotRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() =>
+      setSlotPx({ w: el.offsetWidth, h: el.offsetHeight }))
+    ro.observe(el)
+    setSlotPx({ w: el.offsetWidth, h: el.offsetHeight })
+    return () => ro.disconnect()
+  }, [])
 
   const patch = (p: Partial<SubjectCropState>) =>
     onChange({ ...value, ...p })
 
   const changeScale = (delta: number) =>
-    patch({ scale: Math.max(0.5, Math.min(3.0, value.scale + delta)) })
+    patch({ scale: Math.max(0.1, Math.min(4.0, value.scale + delta)) })
 
-  // ── Drag ─────────────────────────────────────────────────────────────────
+  const setScale = (s: number) =>
+    patch({ scale: Math.max(0.1, Math.min(4.0, s)) })
+
+  // ── Drag ──────────────────────────────────────────────────────────────────
 
   const onMouseDown = (e: React.MouseEvent) => {
-    if (!cropFrame.allowUserMove) return
+    if (!slot.allowUserMove) return
     e.preventDefault()
     dragRef.current = {
       active: true,
@@ -46,13 +78,13 @@ export default function CropEditor({ imageUrl, cropFrame, value, onChange }: Pro
       startOx: value.offsetX,
       startOy: value.offsetY,
     }
-    if (containerRef.current) containerRef.current.style.cursor = 'grabbing'
+    if (slotRef.current) slotRef.current.style.cursor = 'grabbing'
   }
 
   const onMouseMove = (e: React.MouseEvent) => {
     const d = dragRef.current
-    if (!d.active || !containerRef.current) return
-    const rect = containerRef.current.getBoundingClientRect()
+    if (!d.active || !slotRef.current) return
+    const rect = slotRef.current.getBoundingClientRect()
     patch({
       offsetX: Math.max(-0.5, Math.min(0.5, d.startOx + (e.clientX - d.startX) / rect.width)),
       offsetY: Math.max(-0.5, Math.min(0.5, d.startOy + (e.clientY - d.startY) / rect.height)),
@@ -61,86 +93,132 @@ export default function CropEditor({ imageUrl, cropFrame, value, onChange }: Pro
 
   const stopDrag = () => {
     dragRef.current.active = false
-    if (containerRef.current) containerRef.current.style.cursor = 'grab'
+    if (slotRef.current) slotRef.current.style.cursor = slot.allowUserMove ? 'grab' : 'default'
   }
 
-  // ── Wheel zoom (passive: false required to call preventDefault) ───────────
+  // Wheel zoom intentionally removed — it conflicted with page scrolling,
+  // causing accidental scale-down when the user scrolled over the crop area.
+  // Use the +/− buttons below for explicit zoom control.
 
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el || !cropFrame.allowUserScale) return
-    const handler = (e: WheelEvent) => {
-      e.preventDefault()
-      const cur = valueRef.current
-      onChangeRef.current({
-        ...cur,
-        scale: Math.max(0.5, Math.min(3.0, cur.scale + (e.deltaY > 0 ? -0.05 : 0.05))),
-      })
-    }
-    el.addEventListener('wheel', handler, { passive: false })
-    return () => el.removeEventListener('wheel', handler)
-  }, [cropFrame.allowUserScale])
-
-  // ── Image transform: pan then scale, both from viewport center ───────────
-
-  const imgTransform =
-    `translate(${value.offsetX * 100}%, ${value.offsetY * 100}%) scale(${value.scale})`
+  // ── Subject image transform ───────────────────────────────────────────────
+  const panX = value.offsetX * slotPx.w
+  const panY = value.offsetY * slotPx.h
+  const imgTransform = `translate(-50%, -50%) translate(${panX}px, ${panY}px) scale(${value.scale})`
 
   return (
     <div>
-      {/* Viewport: clips the image to the crop frame's aspect ratio */}
+      {/* Outer canvas — background aspect ratio */}
       <div
-        ref={containerRef}
-        className="relative w-full overflow-hidden rounded-lg border-2 border-indigo-400 select-none"
-        style={{ aspectRatio: String(aspectRatio), cursor: 'grab' }}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={stopDrag}
-        onMouseLeave={stopDrag}
+        className="relative w-full overflow-hidden rounded-lg select-none"
+        style={{ aspectRatio: String(canvasAspectRatio) }}
       >
-        <img
-          src={imageUrl}
-          alt="crop preview"
-          draggable={false}
-          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-          style={{ transform: imgTransform, transformOrigin: 'center center' }}
-        />
-        {/* Corner crop guides */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-2 left-2 w-5 h-5 border-t-2 border-l-2 border-white/80 rounded-tl-sm" />
-          <div className="absolute top-2 right-2 w-5 h-5 border-t-2 border-r-2 border-white/80 rounded-tr-sm" />
-          <div className="absolute bottom-2 left-2 w-5 h-5 border-b-2 border-l-2 border-white/80 rounded-bl-sm" />
-          <div className="absolute bottom-2 right-2 w-5 h-5 border-b-2 border-r-2 border-white/80 rounded-br-sm" />
+        {/* Background image */}
+        {backgroundImageUrl ? (
+          <img
+            src={backgroundImageUrl}
+            alt="background"
+            draggable={false}
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gray-100" />
+        )}
+
+        {/* Slot viewport — crop boundary */}
+        <div
+          ref={slotRef}
+          className="absolute overflow-hidden"
+          style={{
+            left: `${slot.x * 100}%`,
+            top: `${slot.y * 100}%`,
+            width: `${slot.w * 100}%`,
+            height: `${slot.h * 100}%`,
+            cursor: slot.allowUserMove ? 'grab' : 'default',
+          }}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={stopDrag}
+          onMouseLeave={stopDrag}
+        >
+          {/* Subject image — min-w/min-h cover, all pixels accessible via pan */}
+          <img
+            src={imageUrl}
+            alt="subject"
+            draggable={false}
+            className="pointer-events-none"
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              minWidth: '100%',
+              minHeight: '100%',
+              width: 'auto',
+              height: 'auto',
+              maxWidth: 'none',
+              transform: imgTransform,
+              transformOrigin: 'center center',
+            }}
+          />
+
+          {/* Crop boundary: dashed white border + dark shadow */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              border: '2px dashed rgba(255,255,255,0.85)',
+              boxShadow: 'inset 0 0 0 3px rgba(0,0,0,0.25)',
+            }}
+          />
+
+          {/* Rule-of-thirds grid */}
+          <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.3 }}>
+            <div className="absolute top-0 bottom-0 border-l border-white" style={{ left: '33.33%' }} />
+            <div className="absolute top-0 bottom-0 border-l border-white" style={{ left: '66.66%' }} />
+            <div className="absolute left-0 right-0 border-t border-white" style={{ top: '33.33%' }} />
+            <div className="absolute left-0 right-0 border-t border-white" style={{ top: '66.66%' }} />
+          </div>
+
+          {/* Corner accent marks */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-1 left-1 w-6 h-6 border-t-2 border-l-2 border-white rounded-tl" />
+            <div className="absolute top-1 right-1 w-6 h-6 border-t-2 border-r-2 border-white rounded-tr" />
+            <div className="absolute bottom-1 left-1 w-6 h-6 border-b-2 border-l-2 border-white rounded-bl" />
+            <div className="absolute bottom-1 right-1 w-6 h-6 border-b-2 border-r-2 border-white rounded-br" />
+          </div>
         </div>
+
       </div>
 
       {/* Controls row */}
-      <div className="flex items-center gap-2 mt-2">
-        {cropFrame.allowUserScale && (
-          <>
-            <button
-              onClick={() => changeScale(-0.1)}
-              className="w-7 h-7 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold flex items-center justify-center leading-none"
-            >−</button>
-            <span className="text-gray-700 text-xs font-mono w-10 text-center">
-              {Math.round(value.scale * 100)}%
-            </span>
-            <button
-              onClick={() => changeScale(0.1)}
-              className="w-7 h-7 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold flex items-center justify-center leading-none"
-            >+</button>
-          </>
-        )}
-        <span className="text-gray-400 text-xs flex-1">{t('step5.cropHint')}</span>
-        <button
-          onClick={() =>
-            onChange({ cropFrameId: value.cropFrameId, offsetX: 0, offsetY: 0, scale: 1.0 })
-          }
-          className="text-xs text-gray-400 hover:text-red-500 hover:bg-red-50 px-2 py-1 rounded transition-colors"
-        >
-          {t('canvas.reset')}
-        </button>
-      </div>
+      {slot.allowUserScale && (
+        <div className="flex items-center gap-2 mt-2">
+          <button
+            onClick={() => changeScale(-0.1)}
+            className="w-7 h-7 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold flex items-center justify-center leading-none flex-shrink-0"
+          >−</button>
+          <input
+            type="range"
+            min={0.1}
+            max={4.0}
+            step={0.05}
+            value={value.scale}
+            onChange={(e) => setScale(Number(e.target.value))}
+            className="flex-1 accent-indigo-500"
+          />
+          <button
+            onClick={() => changeScale(0.1)}
+            className="w-7 h-7 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold flex items-center justify-center leading-none flex-shrink-0"
+          >+</button>
+          <span className="text-gray-700 text-xs font-mono w-10 text-center flex-shrink-0">
+            {Math.round(value.scale * 100)}%
+          </span>
+          <button
+            onClick={() => onChange({ slotId: value.slotId, offsetX: 0, offsetY: 0, scale: 1.0 })}
+            className="text-xs text-gray-400 hover:text-red-500 hover:bg-red-50 px-2 py-1 rounded transition-colors flex-shrink-0"
+          >
+            {t('canvas.reset')}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -20,7 +20,7 @@ const BASE: WizardState = {
   step: 4, productType: 'PvcBanner', sizeCode: 'A3', occasionType: 'Funeral',
   selectedBackground: null, selectedLayoutId: null, customBackgroundUrl: null,
   subjectAssetId: null, subjectPreviewUrl: null,
-  textConfig: { title: '', subtitle: '', footer: '' },
+  textConfig: {},
   canvasLayout: { background: { x: 0, y: 0, scale: 1, rotation: 0 }, subject: { x: 0, y: 0, scale: 1, rotation: 0 }, title: { x: 0, y: 0, scale: 1, rotation: 0 }, subtitle: { x: 0, y: 0, scale: 1, rotation: 0 }, footer: { x: 0, y: 0, scale: 1, rotation: 0 } }, subjectCropStates: [],
 }
 
@@ -34,9 +34,10 @@ const MOCK_BG: BackgroundDto = {
     {
       id: '22222222-0000-0000-0000-000000000001',
       sizeCode: 'A3',
+      widthMm: 297,
+      heightMm: 420,
       orientation: 'Portrait',
       subjectSlotsJson: '[{"x":0.25,"y":0.15,"w":0.50,"h":0.60}]',
-      subjectCropFramesJson: null,
       textZonesJson: null,
       version: 1,
     },

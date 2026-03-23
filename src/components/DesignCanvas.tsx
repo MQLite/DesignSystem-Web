@@ -1,14 +1,27 @@
 import { useRef, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { TextConfig, CanvasLayout, LayerTransform } from '../types'
+import type { TextConfig, CanvasLayout, LayerTransform, SubjectCropState, SubjectSlot, TextZone } from '../types'
+import { DEFAULT_LAYER } from '../types'
 
 type LayerKey = keyof CanvasLayout
-const LAYER_KEYS: LayerKey[] = ['background', 'subject', 'title', 'subtitle', 'footer']
+const TEXT_LAYER_KEYS = ['title', 'subtitle', 'footer'] as const
 
 interface Props {
   backgroundUrl: string | null
   subjectUrl: string | null
+  /** Crop pan/zoom state from Step 5 — applied within the slot viewport. */
+  subjectCropState?: SubjectCropState | null
+  /** Parsed slots from the selected layout — used to position and clip the subject. */
+  slots?: SubjectSlot[]
   textConfig: TextConfig
+  /** Text zones parsed from the layout — positions each text element on the canvas. */
+  textZones?: TextZone[]
+  /**
+   * Aspect ratio of the layout (widthMm / heightMm).
+   * Must match CropEditor and the backend canvas dimensions so pan/zoom is consistent.
+   * Defaults to 3/4 when omitted.
+   */
+  layoutAspectRatio?: number
   layout: CanvasLayout
   /** When provided the canvas becomes interactive (drag / scroll-zoom / rotate) */
   onLayoutChange?: (l: CanvasLayout) => void
@@ -16,7 +29,7 @@ interface Props {
 }
 
 export default function DesignCanvas({
-  backgroundUrl, subjectUrl, textConfig, layout, onLayoutChange, watermark,
+  backgroundUrl, subjectUrl, subjectCropState, slots, textConfig, textZones, layoutAspectRatio, layout, onLayoutChange, watermark,
 }: Props) {
   const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -135,8 +148,17 @@ export default function DesignCanvas({
       ? { outline: '2px dashed rgb(99,102,241)', outlineOffset: '3px', zIndex: 10 }
       : {}
 
+  // Layer keys shown in the toolbar — always include background + subject,
+  // then only text layers that exist as zones in the current template.
+  const zoneIds = (textZones ?? []).map((z) => z.id)
+  const activeLayerKeys: LayerKey[] = [
+    'background',
+    'subject',
+    ...TEXT_LAYER_KEYS.filter((k) => zoneIds.includes(k)),
+  ]
+
   const { background: bg, subject } = layout
-  const sel = layout[activeLayer]
+  const sel = layout[activeLayer] ?? DEFAULT_LAYER
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -146,8 +168,11 @@ export default function DesignCanvas({
       <div className="flex-1 flex flex-col min-w-0">
         <div
           ref={containerRef}
-          className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-100 aspect-[3/4] select-none"
-          style={{ cursor: interactive ? 'grab' : 'default' }}
+          className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-100 select-none"
+          style={{
+            aspectRatio: String(layoutAspectRatio ?? (3 / 4)),
+            cursor: interactive ? 'grab' : 'default',
+          }}
           onMouseDown={onCanvasMouseDown}
           onMouseMove={onMouseMove}
           onMouseUp={stopDrag}
@@ -174,113 +199,128 @@ export default function DesignCanvas({
             )}
           </div>
 
-          {/* Layer 2: Subject */}
-          {subjectUrl && (
-            <div
-              className="absolute pointer-events-auto"
-              style={{
-                left: '50%',
-                top: '50%',
-                width: '70%',
-                transform: subjectTransform(subject),
-                transformOrigin: 'center center',
-                ...activeOutline('subject'),
-              }}
-              onMouseDown={(e) => startLayerDrag('subject', e)}
-            >
-              <img
-                src={subjectUrl}
-                alt="主体"
-                draggable={false}
-                className="w-full h-auto object-contain opacity-90 drop-shadow-lg"
-              />
-            </div>
-          )}
+          {/* Layer 2: Subject — slot-based when slot info is available */}
+          {subjectUrl && (() => {
+            const primarySlot = slots?.[0]
+            if (primarySlot) {
+              // Pan in canvas pixels = offsetFraction × slot pixel size
+              const panX = (subjectCropState?.offsetX ?? 0) * primarySlot.w * cw
+              const panY = (subjectCropState?.offsetY ?? 0) * primarySlot.h * ch
+              const cropScale = subjectCropState?.scale ?? 1.0
+              const imgTransform = `translate(-50%, -50%) translate(${panX}px, ${panY}px) scale(${cropScale})`
+              return (
+                <div
+                  key="subject-slot"
+                  className="absolute overflow-hidden pointer-events-auto"
+                  style={{
+                    left: `${primarySlot.x * 100}%`,
+                    top: `${primarySlot.y * 100}%`,
+                    width: `${primarySlot.w * 100}%`,
+                    height: `${primarySlot.h * 100}%`,
+                    cursor: interactive ? 'grab' : 'default',
+                    ...activeOutline('subject'),
+                  }}
+                  onMouseDown={(e) => startLayerDrag('subject', e)}
+                >
+                  {/* Subject image — min-w/min-h cover with crop pan/zoom */}
+                  <img
+                    src={subjectUrl}
+                    alt="主体"
+                    draggable={false}
+                    className="pointer-events-none"
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      minWidth: '100%',
+                      minHeight: '100%',
+                      width: 'auto',
+                      height: 'auto',
+                      maxWidth: 'none',
+                      opacity: 0.92,
+                      transform: imgTransform,
+                      transformOrigin: 'center center',
+                    }}
+                  />
+                  {/* Dashed slot boundary */}
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      border: '2px dashed rgba(255,255,255,0.75)',
+                      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.3)',
+                    }}
+                  />
+                </div>
+              )
+            }
+            // Fallback: no slot info
+            return (
+              <div
+                key="subject-free"
+                className="absolute pointer-events-auto overflow-hidden"
+                style={{
+                  left: '50%', top: '50%', width: '70%',
+                  transform: subjectTransform(subject),
+                  transformOrigin: 'center center',
+                  ...activeOutline('subject'),
+                }}
+                onMouseDown={(e) => startLayerDrag('subject', e)}
+              >
+                <img
+                  src={subjectUrl}
+                  alt="主体"
+                  draggable={false}
+                  className="w-full h-auto opacity-90 drop-shadow-lg"
+                />
+              </div>
+            )
+          })()}
 
-          {/* Layer 3a: Title — independent draggable text element */}
-          {(textConfig.title || interactive) && (
-            <div
-              className="absolute pointer-events-auto"
-              style={{
-                left: '50%',
-                top: '73%',
-                transform: textLayerTransform(layout.title),
-                transformOrigin: 'center center',
-                cursor: interactive ? 'move' : 'default',
-                ...activeOutline('title'),
-              }}
-              onMouseDown={(e) => startLayerDrag('title', e)}
-            >
-              {textConfig.title ? (
-                <p className="text-white font-bold text-lg leading-tight text-center whitespace-nowrap"
-                   style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
-                  {textConfig.title}
-                </p>
-              ) : (
-                <p className="text-white/30 font-bold text-lg leading-tight text-center italic whitespace-nowrap"
-                   style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
-                  {t('step6.titlePlaceholder')}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Layer 3b: Subtitle — independent draggable text element */}
-          {(textConfig.subtitle || interactive) && (
-            <div
-              className="absolute pointer-events-auto"
-              style={{
-                left: '50%',
-                top: '82%',
-                transform: textLayerTransform(layout.subtitle),
-                transformOrigin: 'center center',
-                cursor: interactive ? 'move' : 'default',
-                ...activeOutline('subtitle'),
-              }}
-              onMouseDown={(e) => startLayerDrag('subtitle', e)}
-            >
-              {textConfig.subtitle ? (
-                <p className="text-white/90 text-sm text-center whitespace-nowrap"
-                   style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
-                  {textConfig.subtitle}
-                </p>
-              ) : (
-                <p className="text-white/20 text-sm text-center italic whitespace-nowrap"
-                   style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
-                  {t('step6.subtitlePlaceholder')}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Layer 3c: Footer — independent draggable text element */}
-          {(textConfig.footer || interactive) && (
-            <div
-              className="absolute pointer-events-auto"
-              style={{
-                left: '50%',
-                top: '91%',
-                maxWidth: '80%',
-                transform: textLayerTransform(layout.footer),
-                transformOrigin: 'center center',
-                cursor: interactive ? 'move' : 'default',
-                ...activeOutline('footer'),
-              }}
-              onMouseDown={(e) => startLayerDrag('footer', e)}
-            >
-              {textConfig.footer ? (
-                <p className="text-white/70 text-xs text-center"
-                   style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
-                  {textConfig.footer}
-                </p>
-              ) : (
-                <p className="text-white/20 text-xs text-center italic"
-                   style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
-                  {t('step6.footerPlaceholder')}
-                </p>
-              )}
-            </div>
-          )}
+          {/* Text layers — positioned at zone coordinates from the layout definition */}
+          {(textZones ?? []).map((zone) => {
+            const text = textConfig[zone.id] ?? ''
+            // Use the matching CanvasLayout transform if this zone ID is a known layer key
+            const layerKey = (TEXT_LAYER_KEYS as readonly string[]).includes(zone.id)
+              ? (zone.id as LayerKey) : null
+            const layerTransform: LayerTransform = layerKey ? layout[layerKey] : DEFAULT_LAYER
+            const isDraggable = interactive && layerKey !== null
+            if (!text && !interactive) return null
+            return (
+              <div
+                key={zone.id}
+                className="absolute pointer-events-auto"
+                style={{
+                  left: `${(zone.x + zone.w / 2) * 100}%`,
+                  top: `${(zone.y + zone.h / 2) * 100}%`,
+                  width: `${zone.w * 100}%`,
+                  transform: textLayerTransform(layerTransform),
+                  transformOrigin: 'center center',
+                  cursor: isDraggable ? 'move' : 'default',
+                  ...(layerKey ? activeOutline(layerKey) : {}),
+                }}
+                onMouseDown={isDraggable ? (e) => startLayerDrag(layerKey!, e) : undefined}
+              >
+                {text ? (
+                  <p
+                    className={`text-white text-center leading-tight ${
+                      zone.id === 'title' ? 'font-bold text-lg whitespace-nowrap' :
+                      zone.id === 'footer' ? 'text-xs opacity-80' : 'text-sm whitespace-nowrap'
+                    }`}
+                    style={{ textShadow: '0 1px 4px rgba(0,0,0,0.85)' }}
+                  >
+                    {text}
+                  </p>
+                ) : (
+                  <p
+                    className="text-white/25 text-sm text-center italic"
+                    style={{ textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}
+                  >
+                    {zone.id}…
+                  </p>
+                )}
+              </div>
+            )
+          })}
 
           {/* Watermark */}
           {watermark && (
@@ -302,7 +342,7 @@ export default function DesignCanvas({
             <p className="text-gray-400 text-[10px] font-semibold text-center uppercase tracking-wide mb-1">
               {t('canvas.layers')}
             </p>
-            {LAYER_KEYS.map((key) => (
+            {activeLayerKeys.map((key) => (
               <button
                 key={key}
                 onClick={() => setActiveLayer(key)}

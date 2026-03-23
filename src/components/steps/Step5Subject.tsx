@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { WizardState, SubjectCropFrame, SubjectCropState } from '../../types'
+import type { WizardState, SubjectSlot, SubjectCropState } from '../../types'
 import { uploadSubject } from '../../api/client'
 import CropEditor from '../CropEditor'
 
@@ -9,17 +9,17 @@ interface Props {
   update: (patch: Partial<WizardState>) => void
 }
 
-/** Parse SubjectCropFrame[] from a layout's subjectCropFramesJson, or return []. */
-function parseCropFrames(json: string | null | undefined): SubjectCropFrame[] {
+/** Parse SubjectSlot[] from a layout's subjectSlotsJson, or return []. */
+function parseSlots(json: string | null | undefined): SubjectSlot[] {
   if (!json) return []
   try { return JSON.parse(json) } catch { return [] }
 }
 
-/** Return the existing CropState for a frame, or a default-initialised one. */
-function getCropState(states: SubjectCropState[], cropFrameId: string): SubjectCropState {
+/** Return the existing CropState for a slot, or a default-initialised one. */
+function getCropState(states: SubjectCropState[], slotId: string): SubjectCropState {
   return (
-    states.find((s) => s.cropFrameId === cropFrameId) ??
-    { cropFrameId, offsetX: 0, offsetY: 0, scale: 1.0 }
+    states.find((s) => s.slotId === slotId) ??
+    { slotId, offsetX: 0, offsetY: 0, scale: 1.0 }
   )
 }
 
@@ -30,13 +30,13 @@ export default function Step5Subject({ state, update }: Props) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Derive crop frames from the currently selected layout
+  // Derive the primary slot from the selected layout — crop viewport shape = slot rect
   const selectedLayout = state.selectedBackground?.layout.find(
     (l) => l.id === state.selectedLayoutId,
   )
-  const cropFrames = parseCropFrames(selectedLayout?.subjectCropFramesJson)
-  // For PoC: use the first crop frame only
-  const primaryCropFrame: SubjectCropFrame | null = cropFrames[0] ?? null
+  const slots = parseSlots(selectedLayout?.subjectSlotsJson)
+  // For PoC: use the first slot only
+  const primarySlot: SubjectSlot | null = slots[0] ?? null
 
   const handleFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -80,9 +80,9 @@ export default function Step5Subject({ state, update }: Props) {
     if (inputRef.current) inputRef.current.value = ''
   }
 
-  /** Update a single crop frame's state, leaving other frames untouched. */
+  /** Update a single slot's crop state, leaving other slots untouched. */
   const handleCropChange = (next: SubjectCropState) => {
-    const others = state.subjectCropStates.filter((s) => s.cropFrameId !== next.cropFrameId)
+    const others = state.subjectCropStates.filter((s) => s.slotId !== next.slotId)
     update({ subjectCropStates: [...others, next] })
   }
 
@@ -123,15 +123,17 @@ export default function Step5Subject({ state, update }: Props) {
             </div>
           </div>
 
-          {/* Crop editor — shown when the selected template defines crop frames */}
-          {primaryCropFrame && (
+          {/* Crop editor — shown when a slot is available in the selected template */}
+          {primarySlot && selectedLayout && (
             <div className="rounded-xl border border-indigo-200 bg-white p-5">
               <h3 className="font-medium text-gray-800 mb-1 text-sm">{t('step5.cropTitle')}</h3>
               <p className="text-xs text-gray-400 mb-4">{t('step5.cropDescription')}</p>
               <CropEditor
+                backgroundImageUrl={state.selectedBackground?.sourcePath ? `/${state.selectedBackground.sourcePath}` : null}
+                backgroundAspectRatio={selectedLayout.widthMm / selectedLayout.heightMm}
                 imageUrl={state.subjectPreviewUrl}
-                cropFrame={primaryCropFrame}
-                value={getCropState(state.subjectCropStates, primaryCropFrame.id)}
+                slot={primarySlot}
+                value={getCropState(state.subjectCropStates, primarySlot.id)}
                 onChange={handleCropChange}
               />
             </div>

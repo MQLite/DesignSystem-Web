@@ -12,7 +12,7 @@ const BASE: WizardState = {
   step: 1, productType: null, sizeCode: null, occasionType: null,
   selectedBackground: null, selectedLayoutId: null, customBackgroundUrl: null,
   subjectAssetId: null, subjectPreviewUrl: null,
-  textConfig: { title: '', subtitle: '', footer: '' },
+  textConfig: {},
   canvasLayout: { background: { x: 0, y: 0, scale: 1, rotation: 0 }, subject: { x: 0, y: 0, scale: 1, rotation: 0 }, title: { x: 0, y: 0, scale: 1, rotation: 0 }, subtitle: { x: 0, y: 0, scale: 1, rotation: 0 }, footer: { x: 0, y: 0, scale: 1, rotation: 0 } }, subjectCropStates: [],
 }
 

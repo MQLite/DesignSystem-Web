@@ -8,11 +8,28 @@ import type { WizardState } from '../types'
 
 const { t } = i18n
 
+const MOCK_ZONES = JSON.stringify([
+  { id: 'title',  x: 0.05, y: 0.02, w: 0.90, h: 0.10 },
+  { id: 'footer', x: 0.05, y: 0.78, w: 0.90, h: 0.20 },
+])
+
+const MOCK_BG = {
+  id: 'bg-1', name: 'Test BG', occasionType: 'Funeral',
+  previewPath: null, sourcePath: null,
+  layout: [{
+    id: 'layout-1', sizeCode: 'A3', widthMm: 297, heightMm: 420,
+    orientation: 'Portrait',
+    subjectSlotsJson: '[]',
+    textZonesJson: MOCK_ZONES,
+    version: 1,
+  }],
+}
+
 const BASE: WizardState = {
   step: 6, productType: 'PvcBanner', sizeCode: 'A3', occasionType: 'Funeral',
-  selectedBackground: null, selectedLayoutId: null, customBackgroundUrl: null,
+  selectedBackground: MOCK_BG, selectedLayoutId: 'layout-1', customBackgroundUrl: null,
   subjectAssetId: null, subjectPreviewUrl: null,
-  textConfig: { title: '', subtitle: '', footer: '' },
+  textConfig: {},
   canvasLayout: { background: { x: 0, y: 0, scale: 1, rotation: 0 }, subject: { x: 0, y: 0, scale: 1, rotation: 0 }, title: { x: 0, y: 0, scale: 1, rotation: 0 }, subtitle: { x: 0, y: 0, scale: 1, rotation: 0 }, footer: { x: 0, y: 0, scale: 1, rotation: 0 } }, subjectCropStates: [],
 }
 
@@ -31,23 +48,21 @@ function Wrapper(init: Partial<WizardState> = {}) {
 }
 
 describe('Step6TextConfig', () => {
-  it('renders three labelled fields', () => {
+  it('renders fields for each text zone defined in the layout', () => {
     Wrapper()
     expect(screen.getByText(t('step6.titleField.label'))).toBeInTheDocument()
-    expect(screen.getByText(t('step6.subtitleField.label'))).toBeInTheDocument()
     expect(screen.getByText(t('step6.footerField.label'))).toBeInTheDocument()
   })
 
-  it('title field is marked required', () => {
+  it('does not render a subtitle field when the layout has no subtitle zone', () => {
     Wrapper()
-    // Required fields render an asterisk next to the label
-    const asterisks = document.querySelectorAll('span.text-red-500')
-    expect(asterisks.length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText(t('step6.subtitleField.label'))).not.toBeInTheDocument()
   })
 
-  it('live preview shows placeholder when title is empty', () => {
+  it('first field is marked required', () => {
     Wrapper()
-    expect(screen.getByText(t('step6.titlePlaceholder'))).toBeInTheDocument()
+    const asterisks = document.querySelectorAll('span.text-red-500')
+    expect(asterisks.length).toBeGreaterThanOrEqual(1)
   })
 
   it('live preview updates as user types in title', async () => {
@@ -55,14 +70,6 @@ describe('Step6TextConfig', () => {
     const inputs = screen.getAllByPlaceholderText(t('common.inputPlaceholder'))
     await userEvent.type(inputs[0], '张三追思会')
     expect(screen.getByText('张三追思会')).toBeInTheDocument()
-    expect(screen.queryByText(t('step6.titlePlaceholder'))).not.toBeInTheDocument()
-  })
-
-  it('typing in subtitle shows it in live preview', async () => {
-    Wrapper({ textConfig: { title: '追思会', subtitle: '', footer: '' } })
-    const inputs = screen.getAllByPlaceholderText(t('common.inputPlaceholder'))
-    await userEvent.type(inputs[1], '1945 — 2025')
-    expect(screen.getByText('1945 — 2025')).toBeInTheDocument()
   })
 
   it('update called with merged textConfig on title change', async () => {
@@ -71,7 +78,7 @@ describe('Step6TextConfig', () => {
     const inputs = screen.getAllByPlaceholderText(t('common.inputPlaceholder'))
     await userEvent.type(inputs[0], 'A')
     expect(update).toHaveBeenLastCalledWith({
-      textConfig: { title: 'A', subtitle: '', footer: '' },
+      textConfig: { title: 'A' },
     })
   })
 
@@ -81,5 +88,14 @@ describe('Step6TextConfig', () => {
     const inputs = screen.getAllByPlaceholderText(t('common.inputPlaceholder'))
     await userEvent.type(inputs[0], 'Hi')
     expect(screen.getAllByText('2 / 40')[0]).toBeInTheDocument()
+  })
+
+  it('shows no-zones message when selected layout has no text zones', () => {
+    const noZonesBg = {
+      ...MOCK_BG,
+      layout: [{ ...MOCK_BG.layout[0], textZonesJson: null }],
+    }
+    Wrapper({ selectedBackground: noZonesBg })
+    expect(screen.getByText(t('step6.noZones'))).toBeInTheDocument()
   })
 })
