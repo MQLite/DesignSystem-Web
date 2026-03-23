@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { WizardState, BackgroundDto, SubjectSlot } from '../../types'
 import { getBackgrounds } from '../../api/client'
+import { slotClipPath } from '../../utils/slotUtils'
 
 function parseSlots(json: string | null | undefined): SubjectSlot[] {
   if (!json) return []
@@ -72,7 +73,7 @@ function BackgroundCard({
           </div>
         )}
 
-        {/* Slot overlays — dashed crop frame hints */}
+        {/* Slot overlays — dashed crop frame hints (respects ellipse/polygon shapes) */}
         {slots.map((slot) => (
           <div
             key={slot.id}
@@ -84,6 +85,7 @@ function BackgroundCard({
               height: `${slot.h * 100}%`,
               border: '2px dashed rgba(255,255,255,0.85)',
               boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.35)',
+              clipPath: slotClipPath(slot),
             }}
           />
         ))}

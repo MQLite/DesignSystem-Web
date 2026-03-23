@@ -15,6 +15,9 @@ export interface BackgroundLayout {
 
 // ── Subject slot + crop types ─────────────────────────────────────────────────
 
+/** Mask shape of a subject slot. Default is "rect" (backward-compatible). */
+export type SlotShape = 'rect' | 'ellipse' | 'polygon'
+
 /**
  * One slot parsed from BackgroundLayout.subjectSlotsJson.
  * Defines where and how the subject image is placed on the final canvas.
@@ -23,10 +26,17 @@ export interface BackgroundLayout {
  */
 export interface SubjectSlot {
   id: string
+  /** Mask shape. Defaults to "rect" when absent (existing data). */
+  shape?: SlotShape
   x: number
   y: number
   w: number
   h: number
+  /**
+   * Polygon vertices in canvas-normalised [x, y] pairs.
+   * Required when shape === "polygon".
+   */
+  points?: Array<[number, number]>
   anchor?: string
   fitMode?: string
   allowUserMove: boolean

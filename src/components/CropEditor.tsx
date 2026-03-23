@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { SubjectSlot, SubjectCropState } from '../types'
+import { slotClipPath } from '../utils/slotUtils'
 
 interface Props {
   /** URL of the selected background image (shown as canvas context). */
@@ -134,6 +135,7 @@ export default function CropEditor({
             width: `${slot.w * 100}%`,
             height: `${slot.h * 100}%`,
             cursor: slot.allowUserMove ? 'grab' : 'default',
+            clipPath: slotClipPath(slot),
           }}
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}

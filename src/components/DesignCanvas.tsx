@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TextConfig, CanvasLayout, LayerTransform, SubjectCropState, SubjectSlot, TextZone } from '../types'
 import { DEFAULT_LAYER } from '../types'
+import { slotClipPath } from '../utils/slotUtils'
 
 type LayerKey = keyof CanvasLayout
 const TEXT_LAYER_KEYS = ['title', 'subtitle', 'footer'] as const
@@ -218,6 +219,7 @@ export default function DesignCanvas({
                     width: `${primarySlot.w * 100}%`,
                     height: `${primarySlot.h * 100}%`,
                     cursor: interactive ? 'grab' : 'default',
+                    clipPath: slotClipPath(primarySlot),
                     ...activeOutline('subject'),
                   }}
                   onMouseDown={(e) => startLayerDrag('subject', e)}
