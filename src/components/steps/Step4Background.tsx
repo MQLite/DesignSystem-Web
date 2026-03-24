@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { WizardState, BackgroundDto, SubjectSlot } from '../../types'
+import type { WizardState, BackgroundDto, SubjectSlot, BgCrop } from '../../types'
+import { DEFAULT_LAYER } from '../../types'
 import { getBackgrounds } from '../../api/client'
 import { slotClipPath } from '../../utils/slotUtils'
 
@@ -200,7 +201,16 @@ export default function Step4Background({ state, update }: Props) {
 
   const handleSelect = (bg: BackgroundDto) => {
     const layout = bg.layout.find((l) => l.sizeCode === state.sizeCode) ?? bg.layout[0]
-    update({ selectedBackground: bg, selectedLayoutId: layout?.id ?? null, customBackgroundUrl: null })
+    const bgCrop: BgCrop = layout?.bgCropJson ? { scale: 1, offsetX: 0, offsetY: 0, ...JSON.parse(layout.bgCropJson) } : { scale: 1, offsetX: 0, offsetY: 0 }
+    update({
+      selectedBackground: bg,
+      selectedLayoutId: layout?.id ?? null,
+      customBackgroundUrl: null,
+      canvasLayout: {
+        ...state.canvasLayout,
+        background: { ...DEFAULT_LAYER, x: bgCrop.offsetX, y: bgCrop.offsetY, scale: bgCrop.scale },
+      },
+    })
   }
 
   if (loading) {

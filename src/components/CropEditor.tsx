@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { SubjectSlot, SubjectCropState } from '../types'
+import type { SubjectSlot, SubjectCropState, BgCrop } from '../types'
 import { slotClipPath } from '../utils/slotUtils'
 
 interface Props {
@@ -8,6 +8,8 @@ interface Props {
   backgroundImageUrl: string | null
   /** widthMm / heightMm of the layout — sets the outer canvas aspect ratio. */
   backgroundAspectRatio: number
+  /** Admin-defined background crop to display background correctly. */
+  bgCrop?: BgCrop | null
   /** URL of the uploaded subject photo. */
   imageUrl: string
   slot: SubjectSlot
@@ -30,6 +32,7 @@ interface Props {
 export default function CropEditor({
   backgroundImageUrl,
   backgroundAspectRatio,
+  bgCrop,
   imageUrl,
   slot,
   value,
@@ -113,13 +116,17 @@ export default function CropEditor({
         className="relative w-full overflow-hidden rounded-lg select-none"
         style={{ aspectRatio: String(canvasAspectRatio) }}
       >
-        {/* Background image */}
+        {/* Background image — apply admin bgCrop transform */}
         {backgroundImageUrl ? (
           <img
             src={backgroundImageUrl}
             alt="background"
             draggable={false}
             className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+            style={bgCrop ? {
+              transform: `translate(${bgCrop.offsetX * 100}%, ${bgCrop.offsetY * 100}%) scale(${bgCrop.scale})`,
+              transformOrigin: 'center center',
+            } : undefined}
           />
         ) : (
           <div className="absolute inset-0 bg-gray-100" />

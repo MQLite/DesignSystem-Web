@@ -131,6 +131,7 @@ export default function Step5Subject({ state, update }: Props) {
               <CropEditor
                 backgroundImageUrl={state.selectedBackground?.sourcePath ? `/${state.selectedBackground.sourcePath}` : null}
                 backgroundAspectRatio={selectedLayout.widthMm / selectedLayout.heightMm}
+                bgCrop={selectedLayout.bgCropJson ? JSON.parse(selectedLayout.bgCropJson) : null}
                 imageUrl={state.subjectPreviewUrl}
                 slot={primarySlot}
                 value={getCropState(state.subjectCropStates, primarySlot.id)}
