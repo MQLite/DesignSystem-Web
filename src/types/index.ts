@@ -82,6 +82,7 @@ export type TextConfig = Record<string, string>
 /**
  * One text zone parsed from BackgroundLayout.textZonesJson.
  * Coordinates are normalised 0..1 (fraction of canvas width/height).
+ * Typography fields are template defaults; Step 6 overrides are stored separately.
  */
 export interface TextZone {
   id: string
@@ -89,6 +90,38 @@ export interface TextZone {
   y: number
   w: number
   h: number
+  /** Admin-set default text pre-filled in Step 6. */
+  defaultText?: string
+  /** Font size as % of zone height [20..150]. Default 50. */
+  fontSize?: number
+  /** System font family name. Default 'Arial'. */
+  fontFamily?: string
+  /** Text fill colour as CSS hex '#rrggbb'. Default '#ffffff'. */
+  color?: string
+  /** Stroke/outline width as % of zone height [0..20]. Default 0 (no stroke). */
+  strokeWidth?: number
+  /** Stroke colour as CSS hex '#rrggbb'. Default '#000000'. */
+  strokeColor?: string
+  /** Horizontal text alignment. Default 'center'. */
+  align?: 'left' | 'center' | 'right'
+  /** When true, text is rendered along an ellipse arc instead of a straight baseline. */
+  arcEnabled?: boolean
+  /** Horizontal semi-axis of the arc ellipse as a fraction of canvas height. Default 0.7. */
+  arcRx?: number
+  /** Vertical semi-axis of the arc ellipse as a fraction of canvas height. Default 0.5. */
+  arcRy?: number
+  /** Which way the arc bows. 'up' = convex upward (rainbow); 'down' = convex downward. Default 'up'. */
+  arcDirection?: 'up' | 'down'
+}
+
+/** Per-zone typography overrides applied by the user in Step 6. */
+export interface TextZoneStyle {
+  fontSize?: number
+  fontFamily?: string
+  color?: string
+  strokeWidth?: number
+  strokeColor?: string
+  align?: 'left' | 'center' | 'right'
 }
 
 export interface LayerTransform {
@@ -131,6 +164,8 @@ export interface ComposePreviewRequest {
   canvasLayoutJson: string
   /** Serialised SubjectCropState[] — user's pan/zoom within each crop frame. Omit when empty. */
   subjectCropStateJson?: string
+  /** Serialised Record<zoneId, TextZoneStyle> — user's per-zone typography overrides. */
+  textStyleOverridesJson?: string
 }
 
 export interface ComposePreviewResponse {
@@ -193,6 +228,8 @@ export interface WizardState {
   subjectAssetId: string | null
   subjectPreviewUrl: string | null
   textConfig: TextConfig
+  /** User's per-zone typography overrides (Step 6). Merged with template defaults at render time. */
+  textStyleOverrides: Record<string, TextZoneStyle>
   canvasLayout: CanvasLayout
   /** User's crop pan/zoom adjustments, one entry per crop frame id. Empty when not yet adjusted. */
   subjectCropStates: SubjectCropState[]

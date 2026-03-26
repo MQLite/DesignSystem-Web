@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { TextConfig, CanvasLayout, LayerTransform, SubjectCropState, SubjectSlot, TextZone } from '../types'
+import type { TextConfig, CanvasLayout, LayerTransform, SubjectCropState, SubjectSlot, TextZone, TextZoneStyle } from '../types'
 import { DEFAULT_LAYER } from '../types'
 import { slotClipPath } from '../utils/slotUtils'
 
@@ -17,6 +17,8 @@ interface Props {
   textConfig: TextConfig
   /** Text zones parsed from the layout — positions each text element on the canvas. */
   textZones?: TextZone[]
+  /** Per-zone typography overrides from Step 6 — merged with zone defaults at render time. */
+  textStyleOverrides?: Record<string, TextZoneStyle>
   /**
    * Aspect ratio of the layout (widthMm / heightMm).
    * Must match CropEditor and the backend canvas dimensions so pan/zoom is consistent.
@@ -30,7 +32,7 @@ interface Props {
 }
 
 export default function DesignCanvas({
-  backgroundUrl, subjectUrl, subjectCropState, slots, textConfig, textZones, layoutAspectRatio, layout, onLayoutChange, watermark,
+  backgroundUrl, subjectUrl, subjectCropState, slots, textConfig, textZones, textStyleOverrides, layoutAspectRatio, layout, onLayoutChange, watermark,
 }: Props) {
   const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -54,6 +56,24 @@ export default function DesignCanvas({
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+
+  // Slot pixel size — measured directly on the slot div to match CropEditor's pan formula
+  const slotRef = useRef<HTMLDivElement>(null)
+  const [slotPx, setSlotPx] = useState({ w: 0, h: 0 })
+
+  // Ref for background img — used to read naturalWidth/naturalHeight for debug logging
+  const bgImgRef = useRef<HTMLImageElement>(null)
+  // Ref for subject img — used to read naturalWidth/naturalHeight for debug logging
+  const subjectImgRef = useRef<HTMLImageElement>(null)
+  useEffect(() => {
+    const el = slotRef.current
+    if (!el) return
+    const update = () => setSlotPx({ w: el.offsetWidth, h: el.offsetHeight })
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [slots, subjectUrl])
 
   const dragRef = useRef({
     active: false,
@@ -136,7 +156,7 @@ export default function DesignCanvas({
   const { w: cw, h: ch } = canvasSize
 
   const bgTransform = (l: LayerTransform) =>
-    `translate(${l.x * cw}px, ${l.y * ch}px) scale(${l.scale}) rotate(${l.rotation}deg)`
+    `translate(${l.x * 100}%, ${l.y * 100}%) scale(${l.scale}) rotate(${l.rotation}deg)`
 
   const subjectTransform = (l: LayerTransform) =>
     `translate(calc(-50% + ${l.x * cw}px), calc(-50% + ${l.y * ch}px)) scale(${l.scale}) rotate(${l.rotation}deg)`
@@ -186,11 +206,28 @@ export default function DesignCanvas({
           >
             {backgroundUrl ? (
               <img
+                ref={bgImgRef}
                 src={backgroundUrl}
                 alt="背景"
                 draggable={false}
-                className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                className="absolute inset-0 w-full h-full object-contain pointer-events-none"
                 style={{ transform: bgTransform(bg), transformOrigin: 'center center' }}
+                onLoad={() => {
+                  const img = bgImgRef.current
+                  if (!img) return
+                  const naturalW = img.naturalWidth
+                  const naturalH = img.naturalHeight
+                  // object-contain: scale that fits the image within (cw × ch)
+                  const containScale = Math.min(cw / naturalW, ch / naturalH)
+                  const renderedW = Math.round(naturalW * containScale)
+                  const renderedH = Math.round(naturalH * containScale)
+                  // translate(bg.x*100%, bg.y*100%) scale(bg.scale) — applied on top of object-contain
+                  console.log(
+                    `[DesignCanvas] Background placed — canvas(${Math.round(cw)}×${Math.round(ch)}) src(${naturalW}×${naturalH}) ` +
+                    `containScale=${containScale.toFixed(3)} bgScale=${bg.scale.toFixed(3)} effectiveScale=${(containScale * bg.scale).toFixed(3)} ` +
+                    `rendered=(${renderedW}×${renderedH}) offset=(${bg.x.toFixed(3)},${bg.y.toFixed(3)})`
+                  )
+                }}
               />
             ) : (
               <div
@@ -204,13 +241,16 @@ export default function DesignCanvas({
           {subjectUrl && (() => {
             const primarySlot = slots?.[0]
             if (primarySlot) {
-              // Pan in canvas pixels = offsetFraction × slot pixel size
-              const panX = (subjectCropState?.offsetX ?? 0) * primarySlot.w * cw
-              const panY = (subjectCropState?.offsetY ?? 0) * primarySlot.h * ch
+              // Pan in slot pixels — use measured slotPx (same approach as CropEditor) with computed fallback
+              const slotW = slotPx.w || primarySlot.w * cw
+              const slotH = slotPx.h || primarySlot.h * ch
+              const panX = (subjectCropState?.offsetX ?? 0) * slotW
+              const panY = (subjectCropState?.offsetY ?? 0) * slotH
               const cropScale = subjectCropState?.scale ?? 1.0
               const imgTransform = `translate(-50%, -50%) translate(${panX}px, ${panY}px) scale(${cropScale})`
               return (
                 <div
+                  ref={slotRef}
                   key="subject-slot"
                   className="absolute overflow-hidden pointer-events-auto"
                   style={{
@@ -224,8 +264,9 @@ export default function DesignCanvas({
                   }}
                   onMouseDown={(e) => startLayerDrag('subject', e)}
                 >
-                  {/* Subject image — min-w/min-h cover with crop pan/zoom */}
+                  {/* Subject image — max-w/max-h contain: full cutout visible at scale=1, transparent edges */}
                   <img
+                    ref={subjectImgRef}
                     src={subjectUrl}
                     alt="主体"
                     draggable={false}
@@ -234,14 +275,33 @@ export default function DesignCanvas({
                       position: 'absolute',
                       top: '50%',
                       left: '50%',
-                      minWidth: '100%',
-                      minHeight: '100%',
+                      maxWidth: '100%',
+                      maxHeight: '100%',
                       width: 'auto',
                       height: 'auto',
-                      maxWidth: 'none',
                       opacity: 0.92,
                       transform: imgTransform,
                       transformOrigin: 'center center',
+                    }}
+                    onLoad={() => {
+                      const img = subjectImgRef.current
+                      if (!img) return
+                      const naturalW = img.naturalWidth
+                      const naturalH = img.naturalHeight
+                      const containScale = Math.min(slotW / naturalW, slotH / naturalH)
+                      const userScale = subjectCropState?.scale ?? 1.0
+                      const finalScale = containScale * userScale
+                      const scaledW = Math.round(naturalW * finalScale)
+                      const scaledH = Math.round(naturalH * finalScale)
+                      const imgLeft = Math.round((slotW - scaledW) / 2 + panX)
+                      const imgTop  = Math.round((slotH - scaledH) / 2 + panY)
+                      console.log(
+                        `[DesignCanvas] Subject placed — slot(${Math.round(primarySlot.x * cw)},${Math.round(primarySlot.y * ch)},${Math.round(slotW)},${Math.round(slotH)}) ` +
+                        `src(${naturalW}×${naturalH}) ` +
+                        `containScale=${containScale.toFixed(3)} userScale=${userScale.toFixed(2)} finalScale=${finalScale.toFixed(3)} ` +
+                        `scaled=(${scaledW}×${scaledH}) pan=(${panX.toFixed(1)},${panY.toFixed(1)}) ` +
+                        `imgTopLeft=(${imgLeft},${imgTop})`
+                      )
                     }}
                   />
                   {/* Dashed slot boundary */}
@@ -281,12 +341,91 @@ export default function DesignCanvas({
           {/* Text layers — positioned at zone coordinates from the layout definition */}
           {(textZones ?? []).map((zone) => {
             const text = textConfig[zone.id] ?? ''
-            // Use the matching CanvasLayout transform if this zone ID is a known layer key
             const layerKey = (TEXT_LAYER_KEYS as readonly string[]).includes(zone.id)
               ? (zone.id as LayerKey) : null
             const layerTransform: LayerTransform = layerKey ? layout[layerKey] : DEFAULT_LAYER
             const isDraggable = interactive && layerKey !== null
             if (!text && !interactive) return null
+
+            // Merge zone defaults with user overrides
+            const ov = textStyleOverrides?.[zone.id] ?? {}
+            const effectiveFontSize   = ov.fontSize    ?? zone.fontSize    ?? 50
+            const effectiveFontFamily = ov.fontFamily  ?? zone.fontFamily  ?? 'Arial'
+            const effectiveColor      = ov.color       ?? zone.color       ?? '#ffffff'
+            const effectiveStrokeW    = ov.strokeWidth ?? zone.strokeWidth ?? 0
+            const effectiveStrokeC    = ov.strokeColor ?? zone.strokeColor ?? '#000000'
+
+            // Font size in px relative to zone height in canvas pixels
+            const zonePxH = zone.h * ch
+            const fontPx  = Math.max(8, zonePxH * effectiveFontSize / 100)
+            const strokePx = effectiveStrokeW > 0 ? Math.max(0.5, fontPx * effectiveStrokeW / 100) : 0
+            const fontWeight = zone.id === 'title' ? 'bold' : 'normal'
+
+            // ── Arc text (SVG textPath) ───────────────────────────────────────
+            if (zone.arcEnabled) {
+              const halfW  = zone.w * cw / 2
+              const cx     = (zone.x + zone.w / 2) * cw
+              const cy     = (zone.y + zone.h / 2) * ch
+              const Rx     = Math.max(halfW + 1, (zone.arcRx ?? 0.7) * ch)
+              const Ry     = Math.max(1,          (zone.arcRy ?? 0.5) * ch)
+              const ratio  = Math.min(1, halfW / Rx)
+              const yOff   = Ry * (1 - Math.sqrt(1 - ratio * ratio))
+              const isUp   = (zone.arcDirection ?? 'up') === 'up'
+              const sx     = cx - halfW
+              const ex     = cx + halfW
+              const sy     = isUp ? cy + yOff : cy - yOff
+              const arcD   = isUp
+                ? `M ${sx.toFixed(1)},${sy.toFixed(1)} A ${Rx.toFixed(1)},${Ry.toFixed(1)} 0 0 0 ${ex.toFixed(1)},${sy.toFixed(1)}`
+                : `M ${sx.toFixed(1)},${sy.toFixed(1)} A ${Rx.toFixed(1)},${Ry.toFixed(1)} 0 0 1 ${ex.toFixed(1)},${sy.toFixed(1)}`
+              const arcId  = `arc-dc-${zone.id}`
+              const sharedTpAttrs = {
+                fontFamily: effectiveFontFamily,
+                fontSize: fontPx,
+                fontWeight,
+                textAnchor: 'middle' as const,
+              }
+              return (
+                <svg
+                  key={zone.id}
+                  style={{
+                    position: 'absolute', inset: 0, width: '100%', height: '100%',
+                    overflow: 'visible', pointerEvents: 'none',
+                  }}
+                  viewBox={`0 0 ${cw} ${ch}`}
+                >
+                  <defs><path id={arcId} d={arcD} /></defs>
+                  {strokePx > 0 ? (
+                    <text {...sharedTpAttrs} fill={effectiveColor}
+                      stroke={effectiveStrokeC} strokeWidth={strokePx}
+                      style={{ paintOrder: 'stroke' }}>
+                      <textPath href={`#${arcId}`} startOffset="50%">{text || `${zone.id}…`}</textPath>
+                    </text>
+                  ) : (
+                    <>
+                      <text {...sharedTpAttrs} fill="rgba(0,0,0,0.7)" transform="translate(1,1)">
+                        <textPath href={`#${arcId}`} startOffset="50%">{text || `${zone.id}…`}</textPath>
+                      </text>
+                      <text {...sharedTpAttrs} fill={text ? effectiveColor : 'rgba(255,255,255,0.25)'}>
+                        <textPath href={`#${arcId}`} startOffset="50%">{text || `${zone.id}…`}</textPath>
+                      </text>
+                    </>
+                  )}
+                </svg>
+              )
+            }
+
+            // ── Straight text ─────────────────────────────────────────────────
+            const effectiveAlign = ov.align ?? zone.align ?? 'center'
+            const textStyle: React.CSSProperties = {
+              fontFamily: effectiveFontFamily,
+              fontSize: `${fontPx}px`,
+              color: effectiveColor,
+              textAlign: effectiveAlign,
+              lineHeight: 1.2,
+              WebkitTextStroke: strokePx > 0 ? `${strokePx}px ${effectiveStrokeC}` : undefined,
+              textShadow: strokePx > 0 ? 'none' : '0 1px 4px rgba(0,0,0,0.85)',
+            }
+
             return (
               <div
                 key={zone.id}
@@ -303,20 +442,10 @@ export default function DesignCanvas({
                 onMouseDown={isDraggable ? (e) => startLayerDrag(layerKey!, e) : undefined}
               >
                 {text ? (
-                  <p
-                    className={`text-white text-center leading-tight ${
-                      zone.id === 'title' ? 'font-bold text-lg whitespace-nowrap' :
-                      zone.id === 'footer' ? 'text-xs opacity-80' : 'text-sm whitespace-nowrap'
-                    }`}
-                    style={{ textShadow: '0 1px 4px rgba(0,0,0,0.85)' }}
-                  >
-                    {text}
-                  </p>
+                  <p style={textStyle}>{text}</p>
                 ) : (
-                  <p
-                    className="text-white/25 text-sm text-center italic"
-                    style={{ textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}
-                  >
+                  <p className="text-white/25 text-sm text-center italic"
+                    style={{ textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>
                     {zone.id}…
                   </p>
                 )}
