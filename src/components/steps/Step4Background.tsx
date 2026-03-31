@@ -1,13 +1,84 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { WizardState, BackgroundDto, SubjectSlot, BgCrop } from '../../types'
+import type { WizardState, BackgroundDto, SubjectSlot, BgCrop, TextZone } from '../../types'
 import { DEFAULT_LAYER } from '../../types'
 import { getBackgrounds } from '../../api/client'
-import { slotClipPath } from '../../utils/slotUtils'
+import { slotClipPath, parseSlots } from '../../utils/slotUtils'
 
-function parseSlots(json: string | null | undefined): SubjectSlot[] {
+function parseTextZones(json: string | null | undefined): TextZone[] {
   if (!json) return []
-  try { return JSON.parse(json) as SubjectSlot[] } catch { return [] }
+  try { return JSON.parse(json) as TextZone[] } catch { return [] }
+}
+
+/** Renders defaultText labels as an SVG overlay on a preview thumbnail. */
+function TextZoneOverlay({ zones, widthMm, heightMm }: {
+  zones: TextZone[]
+  widthMm: number
+  heightMm: number
+}) {
+  const vw = widthMm, vh = heightMm
+  const visible = zones.filter(z => z.defaultText)
+  if (!visible.length) return null
+
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      viewBox={`0 0 ${vw} ${vh}`}
+      preserveAspectRatio="none"
+      overflow="visible"
+    >
+      <defs>
+        {visible.filter(z => z.arcEnabled).map(zone => {
+          const cx = (zone.x + zone.w / 2) * vw
+          const cy = (zone.y + zone.h / 2) * vh
+          const halfW = (zone.w / 2) * vw
+          const Rx = Math.max(halfW + 0.1, (zone.arcRx ?? 0.7) * vh)
+          const Ry = Math.max(0.1, (zone.arcRy ?? 0.5) * vh)
+          const isUp = zone.arcDirection !== 'down'
+          const ratio = Math.min(1, halfW / Rx)
+          const yOff = Ry * (1 - Math.sqrt(1 - ratio * ratio))
+          const sy = isUp ? cy + yOff : cy - yOff
+          const sx = cx - halfW, ex = cx + halfW
+          const sweep = isUp ? 0 : 1
+          const d = `M ${sx.toFixed(2)},${sy.toFixed(2)} A ${Rx.toFixed(2)},${Ry.toFixed(2)} 0 0 ${sweep} ${ex.toFixed(2)},${sy.toFixed(2)}`
+          return <path key={zone.id} id={`arc-${zone.id}`} d={d} fill="none" />
+        })}
+      </defs>
+      {visible.map(zone => {
+        const text = zone.defaultText!
+        const fontSizeMm = (zone.fontSize ?? 50) / 100 * zone.h * vh
+        const fill = zone.color ?? '#ffffff'
+        const strokeW = zone.strokeWidth ? (zone.strokeWidth / 100) * zone.h * vh : 0
+        const stroke = zone.strokeColor ?? '#000000'
+        const fontFamily = zone.fontFamily ?? 'Arial'
+        const anchor = zone.align === 'left' ? 'start' : zone.align === 'right' ? 'end' : 'middle'
+        const cx = (zone.x + zone.w / 2) * vw
+        const cy = (zone.y + zone.h / 2) * vh
+        const textX = anchor === 'start' ? zone.x * vw : anchor === 'end' ? (zone.x + zone.w) * vw : cx
+
+        const commonProps = {
+          fontSize: fontSizeMm,
+          fontFamily,
+          fill,
+          ...(strokeW > 0 ? { stroke, strokeWidth: strokeW, paintOrder: 'stroke fill' } : {}),
+        }
+
+        if (zone.arcEnabled) {
+          return (
+            <text key={zone.id} {...commonProps}>
+              <textPath href={`#arc-${zone.id}`} startOffset="50%" textAnchor="middle">{text}</textPath>
+            </text>
+          )
+        }
+
+        return (
+          <text key={zone.id} x={textX} y={cy} textAnchor={anchor} dominantBaseline="middle" {...commonProps}>
+            {text}
+          </text>
+        )
+      })}
+    </svg>
+  )
 }
 
 function assetUrl(path: string | null): string | null {
@@ -36,10 +107,16 @@ function BackgroundCard({
   const [imgErr, setImgErr] = useState(false)
 
   const slots = parseSlots(layout?.subjectSlotsJson)
+  const textZones = parseTextZones(layout?.textZonesJson)
   const previewAspect =
     layout && layout.widthMm > 0 && layout.heightMm > 0
       ? layout.widthMm / layout.heightMm
       : 3 / 4
+
+  const bgCrop: BgCrop | null = (() => {
+    if (!layout?.bgCropJson) return null
+    try { return JSON.parse(layout.bgCropJson) } catch { return null }
+  })()
 
   return (
     <button
@@ -57,7 +134,11 @@ function BackgroundCard({
           <img
             src={assetUrl(bg.previewPath)!}
             alt={bg.name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
+            style={bgCrop ? {
+              transform: `translate(${bgCrop.offsetX * 100}%, ${bgCrop.offsetY * 100}%) scale(${bgCrop.scale})`,
+              transformOrigin: 'center center',
+            } : undefined}
             onError={() => setImgErr(true)}
           />
         ) : (
@@ -75,21 +156,36 @@ function BackgroundCard({
         )}
 
         {/* Slot overlays — dashed crop frame hints (respects ellipse/polygon shapes) */}
-        {slots.map((slot) => (
-          <div
-            key={slot.id}
-            className="absolute pointer-events-none"
-            style={{
-              left: `${slot.x * 100}%`,
-              top: `${slot.y * 100}%`,
-              width: `${slot.w * 100}%`,
-              height: `${slot.h * 100}%`,
-              border: '2px dashed rgba(255,255,255,0.85)',
-              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.35)',
-              clipPath: slotClipPath(slot),
-            }}
+        {slots.map((slot) => {
+          const shape = slot.shape ?? 'rect'
+          return (
+            <div
+              key={slot.id}
+              className="absolute pointer-events-none"
+              style={{
+                left: `${slot.x * 100}%`,
+                top: `${slot.y * 100}%`,
+                width: `${slot.w * 100}%`,
+                height: `${slot.h * 100}%`,
+                border: '2px dashed rgba(255,255,255,0.85)',
+                boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.35)',
+                // ellipse: border-radius gives a proper ellipse outline
+                // polygon: clip-path clips the rectangular border to the polygon shape
+                // rect: no extra styling needed
+                borderRadius: shape === 'ellipse' ? '50%' : undefined,
+                clipPath: shape === 'polygon' ? slotClipPath(slot) : undefined,
+              }}
+            />
+          )
+        })}
+
+        {layout && (
+          <TextZoneOverlay
+            zones={textZones}
+            widthMm={layout.widthMm}
+            heightMm={layout.heightMm}
           />
-        ))}
+        )}
 
         {selected && (
           <div className="absolute top-2 right-2 w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center">

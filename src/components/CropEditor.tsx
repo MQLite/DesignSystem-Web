@@ -122,7 +122,7 @@ export default function CropEditor({
             src={backgroundImageUrl}
             alt="background"
             draggable={false}
-            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+            className="absolute inset-0 w-full h-full object-contain pointer-events-none"
             style={bgCrop ? {
               transform: `translate(${bgCrop.offsetX * 100}%, ${bgCrop.offsetY * 100}%) scale(${bgCrop.scale})`,
               transformOrigin: 'center center',
@@ -133,67 +133,80 @@ export default function CropEditor({
         )}
 
         {/* Slot viewport — crop boundary */}
-        <div
-          ref={slotRef}
-          className="absolute overflow-hidden"
-          style={{
-            left: `${slot.x * 100}%`,
-            top: `${slot.y * 100}%`,
-            width: `${slot.w * 100}%`,
-            height: `${slot.h * 100}%`,
-            cursor: slot.allowUserMove ? 'grab' : 'default',
-            clipPath: slotClipPath(slot),
-          }}
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={stopDrag}
-          onMouseLeave={stopDrag}
-        >
-          {/* Subject image — min-w/min-h cover, all pixels accessible via pan */}
-          <img
-            src={imageUrl}
-            alt="subject"
-            draggable={false}
-            className="pointer-events-none"
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              minWidth: '100%',
-              minHeight: '100%',
-              width: 'auto',
-              height: 'auto',
-              maxWidth: 'none',
-              transform: imgTransform,
-              transformOrigin: 'center center',
-            }}
-          />
+        {(() => {
+          const slotShape = slot.shape ?? 'rect'
+          const isEllipse = slotShape === 'ellipse'
+          return (
+            <div
+              ref={slotRef}
+              className="absolute overflow-hidden"
+              style={{
+                left: `${slot.x * 100}%`,
+                top: `${slot.y * 100}%`,
+                width: `${slot.w * 100}%`,
+                height: `${slot.h * 100}%`,
+                cursor: slot.allowUserMove ? 'grab' : 'default',
+                // ellipse: border-radius + overflow-hidden clips the image correctly
+                // polygon/rect: use clip-path
+                borderRadius: isEllipse ? '50%' : undefined,
+                clipPath: !isEllipse ? slotClipPath(slot) : undefined,
+              }}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={stopDrag}
+              onMouseLeave={stopDrag}
+            >
+              {/* Subject image — max-w/max-h contain: full cutout visible at scale=1, transparent edges */}
+              <img
+                src={imageUrl}
+                alt="subject"
+                draggable={false}
+                className="pointer-events-none"
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  width: 'auto',
+                  height: 'auto',
+                  transform: imgTransform,
+                  transformOrigin: 'center center',
+                }}
+              />
 
-          {/* Crop boundary: dashed white border + dark shadow */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              border: '2px dashed rgba(255,255,255,0.85)',
-              boxShadow: 'inset 0 0 0 3px rgba(0,0,0,0.25)',
-            }}
-          />
+              {/* Crop boundary: dashed border — ellipse uses border-radius for smooth outline */}
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  border: '2px dashed rgba(255,255,255,0.85)',
+                  boxShadow: 'inset 0 0 0 3px rgba(0,0,0,0.25)',
+                  borderRadius: isEllipse ? '50%' : undefined,
+                }}
+              />
 
-          {/* Rule-of-thirds grid */}
-          <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.3 }}>
-            <div className="absolute top-0 bottom-0 border-l border-white" style={{ left: '33.33%' }} />
-            <div className="absolute top-0 bottom-0 border-l border-white" style={{ left: '66.66%' }} />
-            <div className="absolute left-0 right-0 border-t border-white" style={{ top: '33.33%' }} />
-            <div className="absolute left-0 right-0 border-t border-white" style={{ top: '66.66%' }} />
-          </div>
+              {/* Rule-of-thirds grid (rect only — doesn't add value in ellipse) */}
+              {!isEllipse && (
+                <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.3 }}>
+                  <div className="absolute top-0 bottom-0 border-l border-white" style={{ left: '33.33%' }} />
+                  <div className="absolute top-0 bottom-0 border-l border-white" style={{ left: '66.66%' }} />
+                  <div className="absolute left-0 right-0 border-t border-white" style={{ top: '33.33%' }} />
+                  <div className="absolute left-0 right-0 border-t border-white" style={{ top: '66.66%' }} />
+                </div>
+              )}
 
-          {/* Corner accent marks */}
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-1 left-1 w-6 h-6 border-t-2 border-l-2 border-white rounded-tl" />
-            <div className="absolute top-1 right-1 w-6 h-6 border-t-2 border-r-2 border-white rounded-tr" />
-            <div className="absolute bottom-1 left-1 w-6 h-6 border-b-2 border-l-2 border-white rounded-bl" />
-            <div className="absolute bottom-1 right-1 w-6 h-6 border-b-2 border-r-2 border-white rounded-br" />
-          </div>
-        </div>
+              {/* Corner accent marks (rect only) */}
+              {!isEllipse && (
+                <div className="absolute inset-0 pointer-events-none">
+                  <div className="absolute top-1 left-1 w-6 h-6 border-t-2 border-l-2 border-white rounded-tl" />
+                  <div className="absolute top-1 right-1 w-6 h-6 border-t-2 border-r-2 border-white rounded-tr" />
+                  <div className="absolute bottom-1 left-1 w-6 h-6 border-b-2 border-l-2 border-white rounded-bl" />
+                  <div className="absolute bottom-1 right-1 w-6 h-6 border-b-2 border-r-2 border-white rounded-br" />
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
       </div>
 

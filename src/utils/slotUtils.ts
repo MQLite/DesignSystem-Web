@@ -1,6 +1,22 @@
 import type { SubjectSlot } from '../types'
 
 /**
+ * Parses SubjectSlot[] from a layout's subjectSlotsJson.
+ * Assigns fallback IDs ("slot_0", "slot_1", …) for slots that lack an id field,
+ * matching the backend's SlotParser.cs fallback so crop-state slotId lookups succeed.
+ */
+export function parseSlots(json: string | null | undefined): SubjectSlot[] {
+  if (!json) return []
+  try {
+    const raw = JSON.parse(json) as SubjectSlot[]
+    if (!Array.isArray(raw)) return []
+    return raw.map((s, i) => ({ ...s, id: s.id || `slot_${i}` }))
+  } catch {
+    return []
+  }
+}
+
+/**
  * Returns a CSS `clip-path` value that clips the slot div to its declared shape.
  * - "ellipse": inscribed ellipse filling the bounding box
  * - "polygon": polygon with vertices expressed as percentages relative to the slot div

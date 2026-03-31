@@ -3,16 +3,11 @@ import { useTranslation } from 'react-i18next'
 import type { WizardState, SubjectSlot, SubjectCropState } from '../../types'
 import { uploadSubject } from '../../api/client'
 import CropEditor from '../CropEditor'
+import { parseSlots } from '../../utils/slotUtils'
 
 interface Props {
   state: WizardState
   update: (patch: Partial<WizardState>) => void
-}
-
-/** Parse SubjectSlot[] from a layout's subjectSlotsJson, or return []. */
-function parseSlots(json: string | null | undefined): SubjectSlot[] {
-  if (!json) return []
-  try { return JSON.parse(json) } catch { return [] }
 }
 
 /** Return the existing CropState for a slot, or a default-initialised one. */
@@ -86,6 +81,14 @@ export default function Step5Subject({ state, update }: Props) {
     update({ subjectCropStates: [...others, next] })
   }
 
+  // Use sourcePath as bg reference; fall back to previewPath if not available
+  const bgImageUrl = (() => {
+    const bg = state.selectedBackground
+    if (!bg) return null
+    const path = bg.sourcePath ?? bg.previewPath
+    return path ? `/${path}` : null
+  })()
+
   return (
     <div className="max-w-xl">
       <p className="text-gray-500 text-sm mb-6">{t('step5.hint')}</p>
@@ -129,7 +132,7 @@ export default function Step5Subject({ state, update }: Props) {
               <h3 className="font-medium text-gray-800 mb-1 text-sm">{t('step5.cropTitle')}</h3>
               <p className="text-xs text-gray-400 mb-4">{t('step5.cropDescription')}</p>
               <CropEditor
-                backgroundImageUrl={state.selectedBackground?.sourcePath ? `/${state.selectedBackground.sourcePath}` : null}
+                backgroundImageUrl={bgImageUrl}
                 backgroundAspectRatio={selectedLayout.widthMm / selectedLayout.heightMm}
                 bgCrop={selectedLayout.bgCropJson ? JSON.parse(selectedLayout.bgCropJson) : null}
                 imageUrl={state.subjectPreviewUrl}

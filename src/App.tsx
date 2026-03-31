@@ -22,6 +22,7 @@ const INITIAL: WizardState = {
   subjectAssetId: null,
   subjectPreviewUrl: null,
   textConfig: {},
+  textStyleOverrides: {},
   canvasLayout: DEFAULT_CANVAS_LAYOUT,
   subjectCropStates: [],
 }

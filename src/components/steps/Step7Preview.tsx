@@ -51,7 +51,7 @@ export default function Step7Preview({ state }: Props) {
   const [svgExporting, setSvgExporting] = useState(false)
 
   const { productType, sizeCode, occasionType, selectedBackground, selectedLayoutId,
-    subjectAssetId, textConfig, subjectPreviewUrl, canvasLayout, subjectCropStates } = state
+    subjectAssetId, textConfig, textStyleOverrides, subjectPreviewUrl, canvasLayout, subjectCropStates } = state
 
   const selectedLayout = selectedBackground?.layout.find((l) => l.id === selectedLayoutId)
   const layoutAspectRatio = selectedLayout ? selectedLayout.widthMm / selectedLayout.heightMm : 3 / 4
@@ -70,6 +70,9 @@ export default function Step7Preview({ state }: Props) {
         canvasLayoutJson: JSON.stringify(canvasLayout),
         subjectCropStateJson: subjectCropStates.length > 0
           ? JSON.stringify(subjectCropStates)
+          : undefined,
+        textStyleOverridesJson: Object.keys(textStyleOverrides).length > 0
+          ? JSON.stringify(textStyleOverrides)
           : undefined,
       }
     : null

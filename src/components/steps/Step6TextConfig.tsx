@@ -1,12 +1,8 @@
-import { Fragment } from 'react'
+import { Fragment, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { WizardState, SubjectSlot, TextZone } from '../../types'
+import type { WizardState, TextZone, TextZoneStyle } from '../../types'
 import DesignCanvas from '../DesignCanvas'
-
-function parseSlots(json: string | null | undefined): SubjectSlot[] {
-  if (!json) return []
-  try { return JSON.parse(json) as SubjectSlot[] } catch { return [] }
-}
+import { parseSlots } from '../../utils/slotUtils'
 
 function parseTextZones(json: string | null | undefined): TextZone[] {
   if (!json) return []
@@ -80,24 +76,134 @@ function useZoneI18n(zoneId: string) {
   }
 }
 
+const FONT_FAMILIES = [
+  'Arial', 'Helvetica', 'Times New Roman', 'Georgia',
+  'Courier New', 'Verdana', 'Trebuchet MS', 'Impact',
+]
+
+/** Per-zone typography override controls shown below the text input. */
+function ZoneStyleControls({
+  zone,
+  overrides,
+  onChange,
+}: {
+  zone: TextZone
+  overrides: TextZoneStyle
+  onChange: (patch: Partial<TextZoneStyle>) => void
+}) {
+  const effectiveFontSize   = overrides.fontSize    ?? zone.fontSize    ?? 50
+  const effectiveFontFamily = overrides.fontFamily  ?? zone.fontFamily  ?? 'Arial'
+  const effectiveColor      = overrides.color       ?? zone.color       ?? '#ffffff'
+  const effectiveStrokeW    = overrides.strokeWidth ?? zone.strokeWidth ?? 0
+  const effectiveStrokeC    = overrides.strokeColor ?? zone.strokeColor ?? '#000000'
+  const effectiveAlign      = overrides.align       ?? zone.align       ?? 'center'
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Typography</p>
+      {/* Font family */}
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-gray-500 w-16 flex-shrink-0">Font</label>
+        <select
+          value={effectiveFontFamily}
+          onChange={e => onChange({ fontFamily: e.target.value })}
+          className="flex-1 px-1.5 py-0.5 border border-gray-300 rounded text-xs"
+        >
+          {FONT_FAMILIES.map(f => <option key={f}>{f}</option>)}
+        </select>
+      </div>
+      {/* Font size */}
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-gray-500 w-16 flex-shrink-0">Size %</label>
+        <input
+          type="range" min={20} max={150} step={1}
+          value={effectiveFontSize}
+          onChange={e => onChange({ fontSize: Number(e.target.value) })}
+          className="flex-1 accent-indigo-500"
+        />
+        <span className="w-7 text-right text-xs font-mono text-gray-600">{effectiveFontSize}</span>
+      </div>
+      {/* Color + Align */}
+      <div className="flex items-center gap-3">
+        <label className="text-xs text-gray-500 w-16 flex-shrink-0">Color</label>
+        <input
+          type="color"
+          value={effectiveColor}
+          onChange={e => onChange({ color: e.target.value })}
+          className="w-7 h-7 rounded border-0 p-0 cursor-pointer"
+        />
+        <span className="text-xs font-mono text-gray-400">{effectiveColor}</span>
+        <div className="ml-auto flex gap-0.5">
+          {(['left', 'center', 'right'] as const).map(a => (
+            <button
+              key={a}
+              onClick={() => onChange({ align: a })}
+              className={`px-2 py-0.5 rounded text-[10px] border transition-colors ${
+                effectiveAlign === a
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'text-gray-500 border-gray-300 hover:bg-gray-100'
+              }`}
+            >
+              {a === 'left' ? 'L' : a === 'right' ? 'R' : 'C'}
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* Stroke width */}
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-gray-500 w-16 flex-shrink-0">Stroke %</label>
+        <input
+          type="range" min={0} max={20} step={0.5}
+          value={effectiveStrokeW}
+          onChange={e => onChange({ strokeWidth: Number(e.target.value) })}
+          className="flex-1 accent-indigo-500"
+        />
+        <span className="w-7 text-right text-xs font-mono text-gray-600">{effectiveStrokeW}</span>
+      </div>
+      {/* Stroke color (only when stroke active) */}
+      {effectiveStrokeW > 0 && (
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-500 w-16 flex-shrink-0">Stroke</label>
+          <input
+            type="color"
+            value={effectiveStrokeC}
+            onChange={e => onChange({ strokeColor: e.target.value })}
+            className="w-7 h-7 rounded border-0 p-0 cursor-pointer"
+          />
+          <span className="text-xs font-mono text-gray-400">{effectiveStrokeC}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ZoneField({
-  zone, value, onChange, required,
-}: { zone: TextZone; value: string; onChange: (v: string) => void; required?: boolean }) {
+  zone, value, onChange, overrides, onStyleChange, required,
+}: {
+  zone: TextZone
+  value: string
+  onChange: (v: string) => void
+  overrides: TextZoneStyle
+  onStyleChange: (patch: Partial<TextZoneStyle>) => void
+  required?: boolean
+}) {
   const { t } = useTranslation()
   const i18n = useZoneI18n(zone.id)
-  // Treat as multiline when zone height represents roughly > 1 text line (h > 0.12 of canvas)
   const multiline = zone.h > 0.12
   return (
-    <Field
-      label={i18n.label}
-      hint={i18n.hint}
-      placeholder={t('common.inputPlaceholder')}
-      value={value}
-      onChange={onChange}
-      multiline={multiline}
-      required={required}
-      maxLength={i18n.maxLength}
-    />
+    <div>
+      <Field
+        label={i18n.label}
+        hint={i18n.hint}
+        placeholder={zone.defaultText ?? t('common.inputPlaceholder')}
+        value={value}
+        onChange={onChange}
+        multiline={multiline}
+        required={required}
+        maxLength={i18n.maxLength}
+      />
+      <ZoneStyleControls zone={zone} overrides={overrides} onChange={onStyleChange} />
+    </div>
   )
 }
 
@@ -105,6 +211,7 @@ export default function Step6TextConfig({ state, update }: Props) {
   const { t } = useTranslation()
   const {
     textConfig: tc,
+    textStyleOverrides,
     selectedBackground,
     customBackgroundUrl,
     subjectPreviewUrl,
@@ -118,8 +225,30 @@ export default function Step6TextConfig({ state, update }: Props) {
   const slots = parseSlots(selectedLayout?.subjectSlotsJson)
   const textZones = parseTextZones(selectedLayout?.textZonesJson)
 
+  // Pre-fill textConfig from zone.defaultText when the field is empty
+  useEffect(() => {
+    const patch: Record<string, string> = {}
+    textZones.forEach(zone => {
+      if (zone.defaultText && !tc[zone.id]) {
+        patch[zone.id] = zone.defaultText
+      }
+    })
+    if (Object.keys(patch).length > 0) {
+      update({ textConfig: { ...tc, ...patch } })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLayoutId])
+
   const setField = (id: string, value: string) =>
     update({ textConfig: { ...tc, [id]: value } })
+
+  const setStyle = (id: string, patch: Partial<TextZoneStyle>) =>
+    update({
+      textStyleOverrides: {
+        ...textStyleOverrides,
+        [id]: { ...(textStyleOverrides[id] ?? {}), ...patch },
+      },
+    })
 
   const effectiveBgUrl =
     customBackgroundUrl ??
@@ -143,6 +272,8 @@ export default function Step6TextConfig({ state, update }: Props) {
                   zone={zone}
                   value={tc[zone.id] ?? ''}
                   onChange={(v) => setField(zone.id, v)}
+                  overrides={textStyleOverrides[zone.id] ?? {}}
+                  onStyleChange={(patch) => setStyle(zone.id, patch)}
                   required={i === 0}
                 />
               </Fragment>
@@ -159,6 +290,7 @@ export default function Step6TextConfig({ state, update }: Props) {
             slots={slots}
             textConfig={tc}
             textZones={textZones}
+            textStyleOverrides={textStyleOverrides}
             layoutAspectRatio={selectedLayout ? selectedLayout.widthMm / selectedLayout.heightMm : undefined}
             layout={canvasLayout}
             onLayoutChange={(l) => update({ canvasLayout: l })}
